@@ -17,20 +17,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // One fixed signing key, so updates install over the old app and keep its saved room.
-    // Kept in the repo on purpose: this app is only sideloaded by two people. Set the
-    // IHEARTU_KEYSTORE* environment variables to use a private key instead.
+    // The signing key never sits in the repo in readable form: the GitHub build decrypts
+    // app/iheartu-release.jks.enc with the IHEARTU_SIGNING_PASSWORD secret and passes it in here.
     signingConfigs {
         release {
-            storeFile file(System.getenv("IHEARTU_KEYSTORE") ?: "../../iheartu-release.jks")
-            storePassword System.getenv("IHEARTU_KEYSTORE_PASSWORD") ?: "iheartu-heart"
-            keyAlias System.getenv("IHEARTU_KEY_ALIAS") ?: "iheartu"
-            keyPassword System.getenv("IHEARTU_KEY_PASSWORD") ?: "iheartu-heart"
+            if (System.getenv("IHEARTU_KEYSTORE")) {
+                storeFile file(System.getenv("IHEARTU_KEYSTORE"))
+                storePassword System.getenv("IHEARTU_SIGNING_PASSWORD")
+                keyAlias "iheartu"
+                keyPassword System.getenv("IHEARTU_SIGNING_PASSWORD")
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (System.getenv("IHEARTU_KEYSTORE")) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

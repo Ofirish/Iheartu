@@ -26,14 +26,29 @@ jobs:
       - name: Prepare the Android project
         working-directory: app
         run: npx cap sync android
+      - name: Unlock the signing key
+        env:
+          IHEARTU_SIGNING_PASSWORD: ${{ secrets.IHEARTU_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$IHEARTU_SIGNING_PASSWORD" ]; then
+            echo "::error::Add the repository secret IHEARTU_SIGNING_PASSWORD (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -in app/iheartu-release.jks.enc \
+            -out "$RUNNER_TEMP/iheartu.jks" -pass env:IHEARTU_SIGNING_PASSWORD
       - name: Build the APK
         working-directory: app/android
         env:
           APP_VERSION_CODE: ${{ github.run_number }}
           APP_VERSION_NAME: 1.${{ github.run_number }}
+          IHEARTU_KEYSTORE: ${{ runner.temp }}/iheartu.jks
+          IHEARTU_SIGNING_PASSWORD: ${{ secrets.IHEARTU_SIGNING_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
+      - name: Remove the unlocked key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/iheartu.jks"
       - name: Publish on Releases
         env:
           GH_TOKEN: ${{ github.token }}
