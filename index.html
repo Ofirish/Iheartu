@@ -1421,7 +1421,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   setTimeout(function () { settled = true; updateStatus(); }, 2500);
   setInterval(function () {
-    if (document.visibilityState === 'visible') { lastSeenAt = Date.now(); saveSeen(); }
+    if (document.visibilityState === 'visible' && !catchingUp) { lastSeenAt = Date.now(); saveSeen(); }
     updateStatus();
   }, 5000);
 
@@ -1580,12 +1580,18 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  var catchingUp = false;   // true while the saved messages are being read after opening or returning
+  function flushAway() {
+    if (pending > 0 && document.visibilityState === 'visible') { showAway(pending); pending = 0; savePending(); }
+  }
   function historyDone() {
+    catchingUp = false;
     savePending();
     checkStreak();
     showNextNote();
     lastSeenAt = Date.now();
     saveSeen();
+    flushAway();   // show "loved N times while away" as soon as you are back, no touch needed
   }
   function loadHistory(done) {
     var maxT = 0, finished = false;
@@ -1721,6 +1727,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
 
   function startSession() {
+    if (!NS) catchingUp = true;
     if (useFb && !NS) { openFb(); return; }
     if (NS) {   // test pane: no relay, no history, just the other pane
       splitChannel();
@@ -1800,7 +1807,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       wake();
       // back after a while: catch up on what you missed
       if (Date.now() - lastSeenAt > 20000) startSession();
-      else if (connected) send({ t: 'hi' });
+      else { flushAway(); if (connected) send({ t: 'hi' }); }
     }
   });
   window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); fbLeave(); });
