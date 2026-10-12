@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&display=swap">
 <style>
-/* Layout: one full-bleed canvas (heart, galaxy, ripples), a "last tickled" line at the top, a caption and invite
+/* Layout: one full-bleed canvas (heart, galaxy, ripples), a caption and invite
    button at the bottom. Single dark look on purpose: the glow needs a night ground. */
 :root {
   color-scheme: dark;
@@ -37,26 +37,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 #heart { position: fixed; inset: 0; display: block; touch-action: none; cursor: pointer; }
-
-.tickled {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 16px);
-  left: 0;
-  right: 0;
-  padding-inline: 60px;
-  text-align: center;
-  text-wrap: balance;
-  pointer-events: none;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 500;
-  font-size: 1.05rem;
-  line-height: 1.3;
-  color: var(--blush);
-  opacity: 0.8;
-  text-shadow: 0 0 14px rgba(255, 79, 163, 0.55);
-}
-.tickled:empty { display: none; }
 
 .toast {
   position: fixed;
@@ -202,7 +182,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 <body>
 
 <canvas id="heart" role="img" aria-label="A glittering pink heart that pulses. Touch it to send glowing ripples to the person you shared the link with."></canvas>
-<div class="tickled" id="tickled"></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="love" id="love" role="status"></div>
 <div class="caption" aria-live="polite">
@@ -221,7 +200,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var ctx = cv.getContext('2d');
   var statusEl = document.getElementById('status');
   var noteEl = document.getElementById('note');
-  var tickledEl = document.getElementById('tickled');
   var toastEl = document.getElementById('toast');
   var inviteBtn = document.getElementById('invite');
   var loveEl = document.getElementById('love');
@@ -255,28 +233,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function nightFor(zone, d) {
     var h = hourIn(zone, d);
     return h >= NIGHT_START || h < NIGHT_END;
-  }
-  function offsetMin(zone, d) {
-    var f = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    var p = {};
-    f.formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
-    var asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
-    return Math.round((asUtc - (d.getTime() - d.getMilliseconds())) / 60000);
-  }
-  function fmtAt(ms, zone) {
-    var d = new Date(ms);
-    var opts = zone ? { timeZone: zone } : {};
-    var time = d.toLocaleTimeString([], Object.assign({ hour: 'numeric', minute: '2-digit' }, opts));
-    var today = new Date().toLocaleDateString('en-CA', opts);
-    var that = d.toLocaleDateString('en-CA', opts);
-    var prefix = '';
-    if (that !== today) {
-      var diff = Math.round((Date.parse(today) - Date.parse(that)) / 86400000);
-      if (diff === 1) prefix = 'yesterday ';
-      else if (diff > 1 && diff < 7) prefix = d.toLocaleDateString([], Object.assign({ weekday: 'short' }, opts)) + ' ';
-      else prefix = d.toLocaleDateString([], Object.assign({ day: 'numeric', month: 'short' }, opts)) + ' ';
-    }
-    return prefix + time;
   }
   // </helpers>
 
@@ -794,20 +750,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function savePending() { lsSet(K('pending'), pending); }
   function saveSeen() { lsSet(K('seen'), lastSeenAt); }
 
-  // ---- Messages: tickled line, toast, status ----
-  function updateTickled() {
-    var lt = effLastTouch();
-    if (!lt) { tickledEl.textContent = ''; return; }
-    var txt = 'Heart last tickled at ' + fmtAt(lt, myZone);
-    var pz = effPartnerZone();
-    try {
-      if (pz && myZone && pz !== myZone && offsetMin(pz, new Date(lt)) !== offsetMin(myZone, new Date(lt))) {
-        txt += ' (yours) · ' + fmtAt(lt, pz) + ' (theirs)';
-      }
-    } catch (e) {}
-    tickledEl.textContent = txt;
-  }
-
+  // ---- Messages: toast, status ----
   var toastTimer = 0;
   function showToast(txt) {
     toastEl.textContent = txt;
@@ -830,7 +773,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     inviteBtn.hidden = together;   // no need to invite once you are both here
     var n = nightNow;
     noteEl.textContent = n.me && n.them ? "Night mode · it's night for you both" : n.me ? "Night mode · it's night for you" : n.them ? "Night mode · it's night for them" : '';
-    updateTickled();
   }
   setTimeout(function () { settled = true; updateStatus(); }, 2500);
   setInterval(function () {
@@ -988,7 +930,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (pending > 0) { showAway(pending); pending = 0; savePending(); }
     addTouch(u, v, true);
     send({ t: 'touch', d: isDown ? 1 : 0, u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
-    updateTickled();
   }
 
   function wake() {
@@ -1063,7 +1004,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'time', label: 'Time of day', opts: [['auto', 'Auto'], ['day', 'Day'], ['night-me', 'Night: you'], ['night-them', 'Night: them'], ['night-both', 'Night: both']] },
     { key: 'partner', label: 'Other person', opts: [['auto', 'Auto'], ['waiting', 'Waiting'], ['here', 'Here'], ['reconnecting', 'Reconnecting']] },
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
-    { key: 'tickled', label: 'Last tickled', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
+    { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
   var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
