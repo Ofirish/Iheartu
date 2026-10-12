@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#13030e">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Shared Heartbeat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&display=swap">
+<style>
+/* Layout: one full-bleed canvas, a glittering heart centred just above middle, a caption and invite button at the bottom.
+   Single dark look: the glow needs a night ground. */
+:root {
+  color-scheme: dark;
+  --bg: #13030e;
+  --rose: #ff4fa3;
+  --blush: #ffd0e8;
+  --deep: #7a1d4d;
+  --ink: #ffe3f1;
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  padding-inline: 16px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#heart { position: fixed; inset: 0; display: block; touch-action: none; cursor: pointer; }
+.caption {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  padding-inline: 16px;
+  text-align: center;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+}
+.caption p { margin: 0; }
+.hint { font-size: 1.5rem; color: var(--blush); letter-spacing: 0.02em; text-shadow: 0 0 18px rgba(255, 79, 163, 0.7); }
+.status { margin-top: 6px; min-height: 1.4em; font-size: 1.05rem; color: var(--blush); opacity: 0.75; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.status:empty { visibility: hidden; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--deep); flex: none; }
+.status.together::before { background: var(--rose); box-shadow: 0 0 10px 2px var(--rose); }
+.invite {
+  pointer-events: auto;
+  margin-top: 14px;
+  min-height: 44px;
+  padding: 8px 22px;
+  border: 1px solid rgba(255, 208, 234, 0.4);
+  border-radius: 999px;
+  background: rgba(19, 3, 14, 0.5);
+  color: var(--blush);
+  font: inherit;
+  font-size: 1.05rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.invite:hover { border-color: var(--rose); }
+.invite:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+.love {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 94vw;
+  margin: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  background: linear-gradient(100deg, #ffb3e6 0%, #e2bbff 35%, #b890ff 65%, #ffb3e6 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(60, 5, 70, 0.75)) drop-shadow(0 0 10px rgba(255, 79, 163, 0.95)) drop-shadow(0 0 26px rgba(160, 90, 255, 0.9));
+  animation: loveShimmer 3s linear infinite;
+}
+@keyframes loveShimmer { from { background-position: 0% 0; } to { background-position: 200% 0; } }
+@media (prefers-reduced-motion: reduce) { .love { animation: none; } }
+</style>
+</head>
+<body>
+
+<canvas id="heart" role="img" aria-label="A glittering pink heart that pulses. Touch it to send glowing ripples to the person you shared the link with."></canvas>
+<div class="love" id="love" role="status"></div>
+<div class="caption" aria-live="polite">
+  <p class="hint">Touch the heart</p>
+  <p class="status" id="status"></p>
+  <button class="invite" id="invite" type="button">Invite someone</button>
+</div>
+
+<script>
+(function () {
+  var cv = document.getElementById('heart');
+  var ctx = cv.getContext('2d');
+  var statusEl = document.getElementById('status');
+  var inviteBtn = document.getElementById('invite');
+  var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var AMP = reduce ? 0.03 : 0.065;
+  var DUR = reduce ? 1.6 : 2.4;
+  var MINE = '255,79,163';
+  var THEIRS = '255,208,234';
+
+  var W = 0, H = 0, dpr = 1, cx = 0, cy = 0, S = 1;
+
+  // Heart outline in its own units: x -16..16, y -14.5..14.5, y pointing down, centred on 0,0.
+  var hp = new Path2D();
+  for (var i = 0; i <= 180; i++) {
+    var t = i / 180 * Math.PI * 2;
+    var hx = 16 * Math.pow(Math.sin(t), 3);
+    var hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) - 2.5;
+    if (i === 0) hp.moveTo(hx, hy); else hp.lineTo(hx, hy);
+  }
+  hp.closePath();
+
+  // Glitter: random points that fall inside the heart.
+  var tc = document.createElement('canvas').getContext('2d');
+  var glitter = [];
+  var tries = 0;
+  while (glitter.length < 420 && tries < 30000) {
+    tries++;
+    var gx = Math.random() * 32 - 16;
+    var gy = Math.random() * 29 - 14.5;
+    if (tc.isPointInPath(hp, gx, gy)) {
+      glitter.push({
+        x: gx, y: gy,
+        r: 0.1 + Math.random() * Math.random() * 0.5,
+        ph: Math.random() * 6.283,
+        sp: 0.8 + Math.random() * 3.2,
+        w: Math.random() < 0.45
+      });
+    }
+  }
+
+  var bodyGrad = ctx.createRadialGradient(-5, -6, 1, 0, 0, 20);
+  bodyGrad.addColorStop(0, '#ffa6d6');
+  bodyGrad.addColorStop(0.45, '#ff4fa3');
+  bodyGrad.addColorStop(1, '#b3125f');
+  var glossGrad = ctx.createRadialGradient(-7, -7.5, 0, -7, -7.5, 8);
+  glossGrad.addColorStop(0, 'rgba(255,255,255,0.38)');
+  glossGrad.addColorStop(1, 'rgba(255,255,255,0)');
+
+  var ripples = [];
+  var sparks = [];
+  var boost = 0;
+  var last = 0;
+
+  // "I love you" state
+  var loveEl = document.getElementById('love');
+  var LOVE_TOTAL = 5.6;   // seconds on screen
+  var GRACE = 1500;       // ms: two touches this close count as "at the same time"
+  var PURPLE = '178,110,255';
+  var loveStart = -100;
+  var loveNextRipple = 0;
+  var loveText = false;
+  var mineDown = false;
+  var mineUpAt = 0;
+  var remote = {};
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.style.width = W + 'px';
+    cv.style.height = H + 'px';
+    S = Math.min(W * 0.64 / 32, H * 0.40 / 29);
+    cx = W / 2;
+    cy = H * 0.42;
+    loveEl.style.top = cy + 'px';
+    loveEl.style.fontSize = Math.max(28, S * 5.2) + 'px';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function beatAt(time) {
+    var p = (time % 1.15) / 1.15;
+    function g(c, w) { return Math.exp(-Math.pow((p - c) / w, 2)); }
+    return Math.min(1, g(0.08, 0.06) + 0.65 * g(0.30, 0.07));
+  }
+
+  function burst(px, py, c) {
+    for (var i = 0; i < 14; i++) {
+      var ang = Math.random() * 6.283;
+      var sp = 40 + Math.random() * 130;
+      sparks.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0, max: 0.6 + Math.random() * 0.6, r: 1 + Math.random() * 2.2, c: c });
+    }
+    if (sparks.length > 220) sparks.splice(0, sparks.length - 220);
+  }
+
+  function addTouch(u, v, mine) {
+    var now = performance.now() / 1000;
+    ripples.push({ t0: now, c: mine ? MINE : THEIRS });
+    if (ripples.length > 12) ripples.shift();
+    boost = Math.min(boost + 0.09, 0.16);
+    burst(cx + u * S, cy + v * S, mine ? MINE : THEIRS);
+    try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {}
+  }
+
+  // Each phone works this out on its own from the touches it sees, so both light up together.
+  function mineActive(nowMs) { return mineDown || nowMs - mineUpAt < GRACE; }
+  function remoteActive(nowMs) {
+    for (var id in remote) {
+      var p = remote[id];
+      if (p.holdAt && nowMs - p.holdAt < 10000) return true;
+      var t = p.upAt || p.downAt;
+      if (t && nowMs - t < GRACE) return true;
+    }
+    return false;
+  }
+  function startLove(nowS) {
+    loveStart = nowS;
+    loveNextRipple = nowS;
+    loveEl.textContent = 'I love you';
+    boost = 0.16;
+    try { if (navigator.vibrate) navigator.vibrate([30, 60, 30, 60, 80]); } catch (e) {}
+  }
+  function maybeLove() {
+    var nowMs = performance.now();
+    if (nowMs / 1000 - loveStart < LOVE_TOTAL + 1.5) return;
+    if (mineActive(nowMs) && remoteActive(nowMs)) startLove(nowMs / 1000);
+  }
+  function loveAmount(nowS) {
+    var t = nowS - loveStart;
+    if (t < 0 || t > LOVE_TOTAL) return 0;
+    var e;
+    if (t < 0.6) e = t / 0.6;
+    else if (t < 4.4) e = 1;
+    else e = 1 - (t - 4.4) / 1.2;
+    return e * e * (3 - 2 * e);
+  }
+
+  function drawRipples(now) {
+    for (var i = ripples.length - 1; i >= 0; i--) {
+      var r = ripples[i];
+      var age0 = now - r.t0;
+      if (age0 > DUR + 0.6) { ripples.splice(i, 1); continue; }
+      for (var d = 0; d < 3; d++) {
+        var age = age0 - d * 0.22;
+        if (age <= 0 || age > DUR) continue;
+        var p = age / DUR;
+        var e = 1 - Math.pow(1 - p, 2.2);
+        var sc = 1 + 2.2 * e;
+        var a = Math.pow(1 - p, 1.6) * (d === 0 ? 0.95 : 0.6);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(S * sc, S * sc);
+        ctx.lineWidth = (3.2 * (1 - p) + 0.8) / (S * sc);
+        ctx.strokeStyle = 'rgba(' + r.c + ',' + a + ')';
+        ctx.shadowColor = 'rgba(' + r.c + ',' + a + ')';
+        ctx.shadowBlur = 22 * dpr;
+        ctx.stroke(hp);
+        ctx.restore();
+      }
+    }
+  }
+
+  function frame(ts) {
+    var now = ts / 1000;
+    var dt = Math.min(0.05, now - last);
+    last = now;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    var beat = beatAt(now);
+    boost -= boost * Math.min(1, dt * 5);
+    var k = 1 + AMP * beat + boost;
+
+    var love = loveAmount(now);
+    if (love > 0) {
+      if (now - loveStart < 2.2 && now >= loveNextRipple) {
+        ripples.push({ t0: now, c: PURPLE });
+        loveNextRipple = now + 0.7;
+      }
+      if (love > 0.3 && glitter.length && (!reduce || Math.random() < 0.3)) {
+        var lg = glitter[Math.floor(Math.random() * glitter.length)];
+        sparks.push({ x: cx + lg.x * S * k, y: cy + lg.y * S * k, vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 40, life: 0, max: 0.9 + Math.random() * 0.8, r: 1 + Math.random() * 2, c: Math.random() < 0.5 ? MINE : PURPLE });
+        if (sparks.length > 220) sparks.shift();
+      }
+    }
+
+    var aura = ctx.createRadialGradient(cx, cy, S * 4, cx, cy, Math.max(W, H) * 0.75);
+    aura.addColorStop(0, 'rgba(255,79,163,' + (0.2 + 0.12 * beat + boost) + ')');
+    aura.addColorStop(1, 'rgba(255,79,163,0)');
+    ctx.fillStyle = aura;
+    ctx.fillRect(0, 0, W, H);
+    if (love > 0) {
+      var pa = ctx.createRadialGradient(cx, cy, S * 3, cx, cy, Math.max(W, H) * 0.7);
+      pa.addColorStop(0, 'rgba(160,90,255,' + (0.28 * love) + ')');
+      pa.addColorStop(1, 'rgba(160,90,255,0)');
+      ctx.fillStyle = pa;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    drawRipples(now);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(S * k, S * k);
+    var gr = Math.round(255 - 85 * love), gg = Math.round(79 + 31 * love), gb = Math.round(163 + 92 * love);
+    ctx.shadowColor = 'rgba(' + gr + ',' + gg + ',' + gb + ',0.95)';
+    ctx.shadowBlur = (28 + 36 * beat + boost * 220 + love * 30) * dpr;
+    ctx.fillStyle = bodyGrad;
+    ctx.fill(hp);
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+
+    ctx.save();
+    ctx.clip(hp);
+    ctx.fillStyle = glossGrad;
+    ctx.fillRect(-16, -16, 32, 32);
+    if (love > 0) {
+      ctx.fillStyle = 'rgba(48,10,84,' + (0.4 * love) + ')';
+      ctx.fillRect(-16, -16, 32, 32);
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (var gi = 0; gi < glitter.length; gi++) {
+      var q = glitter[gi];
+      var s = Math.sin(now * q.sp + q.ph);
+      var tw = s > 0 ? Math.pow(s, 6) : 0;
+      var a = 0.1 + 0.9 * tw;
+      ctx.fillStyle = q.w ? 'rgba(255,245,252,' + a + ')' : 'rgba(255,170,215,' + a + ')';
+      var rr = q.r * (0.7 + 0.5 * tw);
+      ctx.fillRect(q.x - rr, q.y - rr, rr * 2, rr * 2);
+      if (tw > 0.55 && q.r > 0.3) {
+        var L = q.r * 5 * tw;
+        ctx.fillRect(q.x - L, q.y - 0.04, L * 2, 0.08);
+        ctx.fillRect(q.x - 0.04, q.y - L, 0.08, L * 2);
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+
+    ctx.lineWidth = 0.18;
+    ctx.strokeStyle = 'rgba(255,214,236,0.6)';
+    ctx.stroke(hp);
+    ctx.restore();
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (var si = sparks.length - 1; si >= 0; si--) {
+      var sp = sparks[si];
+      sp.life += dt;
+      if (sp.life >= sp.max) { sparks.splice(si, 1); continue; }
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+      var damp = Math.max(0, 1 - 2.2 * dt);
+      sp.vx *= damp;
+      sp.vy *= damp;
+      var sa = 1 - sp.life / sp.max;
+      ctx.fillStyle = 'rgba(' + sp.c + ',' + sa + ')';
+      ctx.fillRect(sp.x - sp.r, sp.y - sp.r, sp.r * 2, sp.r * 2);
+      ctx.fillRect(sp.x - sp.r * 3 * sa, sp.y - 0.5, sp.r * 6 * sa, 1);
+      ctx.fillRect(sp.x - 0.5, sp.y - sp.r * 3 * sa, 1, sp.r * 6 * sa);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (love > 0) {
+      loveText = true;
+      loveEl.style.visibility = 'visible';
+      loveEl.style.opacity = love;
+      loveEl.style.transform = 'translate(-50%, -50%) scale(' + (0.9 + 0.1 * love + 0.015 * Math.sin(now * 6)) + ')';
+    } else if (loveText) {
+      loveText = false;
+      loveEl.style.visibility = 'hidden';
+      loveEl.style.opacity = 0;
+      loveEl.textContent = '';
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(function (ts) { last = ts / 1000; frame(ts); });
+
+  // ---- Sync through a free public relay (ntfy.sh). No account, nothing to host. ----
+  // To use your own relay later, change RELAY to your own ntfy server address.
+  var RELAY = 'https://ntfy.sh';
+  var PEER_TTL = 50000;
+
+  // The room code lives in the link after the #. Each phone also remembers it, so the home-screen app
+  // reopens the same room every time, with no expiry.
+  var ROOM_KEY = 'heartbeat-room';
+  function saveRoom(code) { try { localStorage.setItem(ROOM_KEY, code); } catch (e) {} }
+  function setHash(code) { try { history.replaceState(null, '', '#' + code); } catch (e) { location.hash = code; } }
+  function getRoom() {
+    var ok = /^[a-z0-9]{6,32}$/;
+    var h = (location.hash || '').replace(/^#/, '');
+    if (ok.test(h)) { saveRoom(h); return h; }
+    var saved = '';
+    try { saved = localStorage.getItem(ROOM_KEY) || ''; } catch (e) {}
+    if (ok.test(saved)) { setHash(saved); return saved; }
+    // New room: 16 random characters from a 31-letter alphabet (about 79 bits), no modulo bias.
+    var alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    var code = '';
+    while (code.length < 16) {
+      var bytes = new Uint8Array(32);
+      (window.crypto || window.msCrypto).getRandomValues(bytes);
+      for (var i = 0; i < bytes.length && code.length < 16; i++) {
+        if (bytes[i] < 248) code += alphabet.charAt(bytes[i] % 31);
+      }
+    }
+    saveRoom(code);
+    setHash(code);
+    return code;
+  }
+  var room = getRoom();
+  var topic = 'heartbeat-' + room;
+  var me = Math.random().toString(36).slice(2, 10);
+  var peers = {};
+  var connected = false;
+  var settled = false;
+
+  function send(obj) {
+    obj.id = me;
+    try {
+      fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(obj) }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function livePeers() {
+    var now = Date.now(), n = 0;
+    for (var id in peers) if (now - peers[id] < PEER_TTL) n++;
+    return n;
+  }
+
+  function updateStatus() {
+    var txt = '', together = false;
+    if (settled) {
+      if (!connected) txt = 'Reconnecting…';
+      else if (livePeers() >= 1) { txt = 'Both of you are here'; together = true; }
+      else txt = 'Waiting for the other heart';
+    }
+    statusEl.textContent = txt;
+    statusEl.classList.toggle('together', together);
+  }
+  setTimeout(function () { settled = true; updateStatus(); }, 2500);
+  setInterval(updateStatus, 5000);
+
+  function clampUnit(n) { n = Number(n); if (!isFinite(n)) return 0; return Math.max(-3, Math.min(3, n)); }
+
+  function connect() {
+    if (!window.EventSource) return;
+    var es = new EventSource(RELAY + '/' + topic + '/sse');
+    es.onopen = function () { connected = true; send({ t: 'hi' }); updateStatus(); };
+    es.onerror = function () { connected = false; updateStatus(); };
+    es.onmessage = function (ev) {
+      var d, m;
+      try { d = JSON.parse(ev.data); } catch (e) { return; }
+      if (!d || d.event !== 'message') return;
+      try { m = JSON.parse(d.message); } catch (e) { return; }
+      if (!m || typeof m.id !== 'string' || m.id === me) return;
+      var now = Date.now();
+      var isNew = !peers[m.id] || now - peers[m.id] > PEER_TTL;
+      peers[m.id] = now;
+      var rp = remote[m.id] || (remote[m.id] = { downAt: 0, holdAt: 0, upAt: 0 });
+      var tn = performance.now();
+      if (m.t === 'hi') {
+        if (isNew) send({ t: 'hi' });
+      } else if (m.t === 'touch') {
+        rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
+        addTouch(clampUnit(m.u), clampUnit(m.v), false);
+        maybeLove();
+      } else if (m.t === 'hold') {
+        rp.holdAt = tn;
+        maybeLove();
+      } else if (m.t === 'up') {
+        rp.upAt = tn; rp.holdAt = 0;
+      }
+      updateStatus();
+    };
+  }
+  connect();
+  setInterval(function () { if (connected && document.visibilityState === 'visible') send({ t: 'hi' }); }, 20000);
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+
+  // ---- Invite ----
+  var inviteTimer = 0;
+  function flashInvite(text) {
+    inviteBtn.textContent = text;
+    clearTimeout(inviteTimer);
+    inviteTimer = setTimeout(function () { inviteBtn.textContent = 'Invite someone'; }, 2000);
+  }
+  inviteBtn.addEventListener('click', function () {
+    var url = location.href;
+    if (navigator.share) {
+      navigator.share({ title: 'Shared Heartbeat', text: 'Touch the heart with me', url: url }).catch(function () {});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { flashInvite('Link copied'); }, function () { window.prompt('Copy this link', url); });
+    } else {
+      window.prompt('Copy this link', url);
+    }
+  });
+
+  // ---- Touch input ----
+  var pressed = false;
+  var lastSend = 0;
+  var holdTimer = 0;
+  var holdSent = false;
+
+  // A press longer than ~0.4s tells the other phone you are holding, and repeats every 4s so a long hold still counts.
+  function sendHold() {
+    holdSent = true;
+    send({ t: 'hold' });
+    holdTimer = setTimeout(sendHold, 4000);
+  }
+
+  function touch(e) {
+    var u = (e.clientX - cx) / S;
+    var v = (e.clientY - cy) / S;
+    addTouch(u, v, true);
+    send({ t: 'touch', u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
+  }
+
+  function wake() {
+    try {
+      if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(function () {});
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () {
+    wake();
+    if (document.visibilityState === 'visible' && connected) send({ t: 'hi' });
+  });
+
+  cv.addEventListener('pointerdown', function (e) {
+    pressed = true;
+    mineDown = true;
+    lastSend = performance.now();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    wake();
+    touch(e);
+    maybeLove();
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(sendHold, 400);
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!pressed) return;
+    var n = performance.now();
+    if (n - lastSend < 450) return;
+    lastSend = n;
+    touch(e);
+  });
+  function release() {
+    if (!pressed) return;
+    pressed = false;
+    mineDown = false;
+    mineUpAt = performance.now();
+    clearTimeout(holdTimer);
+    if (holdSent) { holdSent = false; send({ t: 'up' }); }
+  }
+  cv.addEventListener('pointerup', release);
+  cv.addEventListener('pointercancel', release);
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+})();
+</script>
+</body>
+</html>
