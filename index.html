@@ -1795,7 +1795,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['luv', 'I love you rain'], ['split', 'Split screen test'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1828,6 +1828,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'mmode') startM();
     else if (a === 'note') openCompose();
     else if (a === 'ach') openAch();
+    else if (a === 'clearach') {
+      sentCount = 0; ach = {}; daysMe = {}; daysThem = {};
+      lsSet(K('sent'), 0); lsSet(K('ach'), '{}'); lsSet(K('daysme'), ''); lsSet(K('daysthem'), '');
+      [7, 30, 100, 365].forEach(function (n) { lsSet(K('flame' + n), ''); });
+      showToast('Achievements cleared');
+    }
     else if (a === 'luv') runFx('luvrain', {}, false);
     else if (a === 'split') { closeAdmin(); openSplit(); }
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
