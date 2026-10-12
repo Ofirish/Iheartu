@@ -368,6 +368,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var last = 0;
   var phase = 0;
   var dull = 0;          // 0 = lively, 1 = resting
+  var pulseAmt = 0, hereNow = false;   // the heart only beats while both partners are in the room
   var nightAmt = 0;      // 0 = day, 1 = night
   var nightNow = { me: false, them: false };
   var nightChecked = -99;
@@ -1170,18 +1171,20 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var sig = nightNow.me + ',' + nightNow.them;
       if (sig !== nightSig) { nightSig = sig; updateStatus(); }
       updateAnniv();
+      hereNow = effPeer() === 'here';
     }
     var nightT = (nightNow.me || nightNow.them) ? 1 : 0;
     nightAmt += (nightT - nightAmt) * Math.min(1, dt * 0.8);
     var idleT = effIdle() ? 1 : 0;
     dull += (idleT - dull) * Math.min(1, dt * 1.6);
+    pulseAmt += ((hereNow ? 1 : 0) - pulseAmt) * Math.min(1, dt * 2);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
     var period = 1.15 + 2.65 * nightAmt;      // about 3.8 s per beat at night
     phase = (phase + dt / period) % 1;
-    var beat = beatAt(phase) * (1 - dull);
+    var beat = beatAt(phase) * (1 - dull) * pulseAmt;
     boost -= boost * Math.min(1, dt * 5);
     var amp = AMP * (1 - 0.45 * nightAmt);
     var k = 1 + amp * beat + boost;
