@@ -800,6 +800,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   if (/[?&]r=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} }
   var topic = 'heartbeat-' + room;
   function K(n) { return 'hb-' + room + '-' + n; }
+  var paired = lsGet(K('paired')) === '1';
 
   var me = Math.random().toString(36).slice(2, 10);      // this open page, to ignore our own echo
   var did = lsGet('hb-did');                              // this phone, to tell your touches from theirs in history
@@ -833,7 +834,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (st === 'waiting') txt = 'Waiting for the other heart';
     statusEl.textContent = txt;
     statusEl.classList.toggle('together', together);
-    inviteBtn.hidden = together;   // no need to invite once you are both here
+    if (together && ovr.partner === 'auto' && !paired) { paired = true; lsSet(K('paired'), 1); }
+    // once two people have shared a room, never offer the invite again for it
+    inviteBtn.hidden = together || (paired && ovr.partner === 'auto');
     var n = nightNow;
     noteEl.textContent = n.me && n.them ? "Night mode · it's night for you both" : n.me ? "Night mode · it's night for you" : n.them ? "Night mode · it's night for them" : '';
   }
@@ -869,6 +872,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (!m || typeof m.id !== 'string' || typeof m.t !== 'string') return;
     var tms = d.time ? d.time * 1000 : Date.now();
     var mineDev = m.dv === did;
+    if (!mineDev && !paired) { paired = true; lsSet(K('paired'), 1); }
     if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
     if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
       if (tms > lastTouchAt) { lastTouchAt = tms; lsSet(K('lasttouch'), lastTouchAt); }
