@@ -1,6 +1,6 @@
 // Keeps the app opening instantly and offline. Network first, so a new version of the page reaches you right away.
 // Only files from this site are cached; the live connection to the relay is never touched.
-var CACHE = 'heartbeat-v12';
+var CACHE = 'heartbeat-v13';
 var FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {

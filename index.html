@@ -159,6 +159,14 @@ body {
 .panel button { padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,130,190,.6); background: rgba(255,79,163,.18); color: #ffe9f7; font-family: inherit; font-size: .95rem; }
 .notebox { font-family: var(--font-display); font-style: italic; font-size: 1.5rem; line-height: 1.3; text-wrap: balance; }
 .notebox::after { content: "tap to close"; display: block; margin-top: 12px; font-family: var(--font-ui); font-style: normal; font-size: .75rem; opacity: .6; }
+.split { position: fixed; inset: 0; z-index: 60; background: #000; display: flex; gap: 2px; }
+.split.stack { flex-direction: column; }
+.split[hidden] { display: none; }
+.split .pane { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.split iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #13030e; }
+.split .tag { position: absolute; right: 8px; top: calc(env(safe-area-inset-top, 0px) + 6px); z-index: 2; padding: 2px 9px; border-radius: 999px; font: 600 .75rem var(--font-ui); color: #ffe9f7; background: rgba(255,79,163,.35); pointer-events: none; }
+.split .x { position: absolute; z-index: 61; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 40px); transform: translateX(-50%); width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,130,190,.7); background: rgba(19,3,14,.9); color: #ffe9f7; font-size: 1.1rem; }
+.split.stack .x { top: 50%; transform: translate(-50%, -50%); }
 .hotl { position: fixed; left: 0; bottom: 0; width: 64px; height: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
 .refresh { position: fixed; right: 0; bottom: 0; width: 64px; height: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
 .gate { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; z-index: 31; }
@@ -242,6 +250,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <input id="annivInput" type="date" aria-label="Anniversary date">
   <div class="row"><button type="button" id="annivSave">Save</button><button type="button" id="annivClear">Clear</button><button type="button" id="annivClose">Close</button></div>
 </div>
+<div class="split" id="split" hidden></div>
 <div class="hotl" id="hotl"></div>
 <div class="hot" id="hot"></div>
 <div class="refresh" id="refresh"></div>
@@ -250,6 +259,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
 <script>
 (function () {
+  // Split-screen test panes load this same page with ?as=A or ?as=B. Each pane keeps its own saved data, so it acts as a separate phone.
+  var NS = (/[?&]as=([AB])\b/.exec(location.search) || [])[1] || '';
+  var NSQ = NS ? 'as=' + NS : '';
   var cv = document.getElementById('heart');
   var ctx = cv.getContext('2d');
   var statusEl = document.getElementById('status');
@@ -903,6 +915,41 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (now - statusTapAt < 450) { statusTapAt = 0; openAch(); } else statusTapAt = now;
   });
 
+  // Split-screen test view: two copies of the page side by side, each acting as one partner, talking through the real relay
+  var splitEl = document.getElementById('split');
+  function openSplit() {
+    if (NS) return;
+    splitOpen = true;
+    splitEl.textContent = '';
+    splitEl.className = 'split' + (window.innerWidth >= window.innerHeight * 1.1 ? '' : ' stack');
+    ['A', 'B'].forEach(function (who) {
+      var pane = document.createElement('div');
+      pane.className = 'pane';
+      var fr = document.createElement('iframe');
+      fr.title = 'Partner ' + who;
+      fr.src = location.pathname + '?as=' + who + '#' + room;
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'Partner ' + who;
+      pane.appendChild(fr);
+      pane.appendChild(tag);
+      splitEl.appendChild(pane);
+    });
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'x';
+    x.textContent = '\u2715';
+    x.setAttribute('aria-label', 'Close split screen');
+    x.addEventListener('click', closeSplit);
+    splitEl.appendChild(x);
+    splitEl.hidden = false;
+  }
+  function closeSplit() {
+    splitOpen = false;
+    splitEl.hidden = true;
+    splitEl.textContent = '';
+  }
+
   // Hidden notes
   var noteQueue = [], noteShowing = false;
   var noteBox = document.getElementById('notebox');
@@ -1235,8 +1282,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   requestAnimationFrame(function (ts) { last = ts / 1000; frame(ts); });
 
   // ---- Storage ----
-  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function lsGet(k) { try { return localStorage.getItem(NS ? NS + ':' + k : k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(NS ? NS + ':' + k : k, String(v)); } catch (e) {} }
 
   // ---- Room ----
   // The room code lives in the link after the #. Each phone also remembers it, so the home-screen app
@@ -1266,7 +1313,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   var room = getRoom();
   // a hard refresh adds ?r=... to bypass cached copies; keep the address clean afterwards
-  if (/[?&]r=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} }
+  if (/[?&]r=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + (NSQ ? '?' + NSQ : '') + location.hash); } catch (e) {} }
   var topic = 'heartbeat-' + room;
   function K(n) { return 'hb-' + room + '-' + n; }
   var paired = lsGet(K('paired')) === '1';
@@ -1328,7 +1375,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var seen = {};
   var es = null;
 
+  var splitOpen = false;   // while the split-screen test view is open, this page stays silent
   function send(obj) {
+    if (splitOpen) return;
     obj.id = me;
     obj.dv = did;
     if (myZone) obj.z = myZone;
@@ -1341,6 +1390,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
   // One relay message. live=false for the saved history that is read when the page opens.
   function ingest(d, live) {
+    if (splitOpen) return;
     if (!d || d.event !== 'message' || typeof d.id !== 'string') return;
     if (seen[d.id]) return;
     seen[d.id] = 1;
@@ -1443,7 +1493,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   startSession();
   setInterval(function () { if (connected && document.visibilityState === 'visible') send({ t: 'hi' }); }, 20000);
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  if (!NS && 'serviceWorker' in navigator && location.protocol === 'https:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   }
 
@@ -1689,7 +1739,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function hardRefresh() {
     if (refreshing) return;
     refreshing = true;
-    var go = function () { location.replace(location.pathname + '?r=' + Date.now() + location.hash); };
+    var go = function () { location.replace(location.pathname + '?r=' + Date.now() + (NSQ ? '&' + NSQ : '') + location.hash); };
     var tasks = [];
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
@@ -1734,7 +1784,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['luv', 'I love you rain'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['luv', 'I love you rain'], ['split', 'Split screen test'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1768,6 +1818,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'note') openCompose();
     else if (a === 'ach') openAch();
     else if (a === 'luv') runFx('luvrain', {}, false);
+    else if (a === 'split') { closeAdmin(); openSplit(); }
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
@@ -1813,6 +1864,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     arow.appendChild(mk('span', 'ad-label', 'Actions'));
     var abox = mk('div', 'ad-opts');
     ACTIONS.forEach(function (a) {
+      if (a[0] === 'split' && NS) return;
       var b = mk('button', '', a[1]);
       b.type = 'button';
       b.addEventListener('click', function () { runAction(a[0]); });
@@ -1835,7 +1887,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     document.body.classList.remove('admin-open');
     resize();
   }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && adminOpen) closeAdmin(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (splitOpen) closeSplit(); else if (adminOpen) closeAdmin(); } });
 })();
 </script>
 </body>
