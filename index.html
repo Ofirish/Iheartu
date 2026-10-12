@@ -719,8 +719,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (k === 'rizz') showToast(RIZZ[(Math.abs(d.i | 0)) % RIZZ.length]);
     else if (k === 'good') {
       boost = 0.14;
-      if (remote) { startLove(nowS, 'Good girl', { quiet: true }); buzz([60, 80, 60, 80, 60], remote); }
-      else { ripples.push({ t0: nowS, c: MINE }); buzz([40, 60, 40], false); }
+      startLove(nowS, 'Good girl', { quiet: true });
+      ripples.push({ t0: nowS, c: remote ? THEIRS : MINE });
+      buzz([60, 80, 60, 80, 60], remote);
     }
   }
   function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
@@ -944,7 +945,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var nowMs = performance.now();
     if (nowMs / 1000 - loveStart < LOVE_TOTAL + 1.5) return;
     if (mineActive(nowMs) && remoteActive(nowMs)) {
-      if (nightNow.me) {
+      if (nightNow.me || nightNow.them) {
         startLove(nowMs / 1000, 'Good night my love', { quiet: true });
         addKiss(cx, cy - 2 * S, true, KISS, false, Math.round(S * 9));
       } else startLove(nowMs / 1000);
