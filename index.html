@@ -1380,11 +1380,27 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var es = null;
 
   var splitOpen = false;   // while the split-screen test view is open, this page stays silent
+  var splitCh = null;
+  function splitChannel() {
+    if (!splitCh && NS && window.BroadcastChannel) {
+      splitCh = new BroadcastChannel('hb-split-' + room);
+      splitCh.onmessage = function (ev) {
+        ingest({ event: 'message', id: 'sp' + Math.random().toString(36).slice(2), time: Date.now() / 1000, message: ev.data }, true);
+        updateStatus();
+      };
+    }
+    return splitCh;
+  }
   function send(obj) {
     if (splitOpen) return;
     obj.id = me;
     obj.dv = did;
     if (myZone) obj.z = myZone;
+    if (NS) {   // split-screen test pane: talk to the other pane directly, never through the relay
+      var sc = splitChannel();
+      if (sc) { try { sc.postMessage(JSON.stringify(obj)); } catch (e) {} }
+      return;
+    }
     try {
       fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: JSON.stringify(obj) }).catch(function () {});
     } catch (e) {}
@@ -1489,6 +1505,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
 
   function startSession() {
+    if (NS) {   // test pane: no relay, no history, just the other pane
+      splitChannel();
+      connected = true;
+      send({ t: 'hi' });
+      updateStatus();
+      return;
+    }
     loadHistory(function (maxT) {
       openStream(maxT ? String(maxT) : '5s');
       updateStatus();
