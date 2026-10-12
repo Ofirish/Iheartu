@@ -1,0 +1,14 @@
+{
+  "appId": "com.ofirish.iheartu",
+  "appName": "I heart U",
+  "webDir": "www",
+  "server": {
+    "url": "https://ofirish.github.io/Iheartu/",
+    "androidScheme": "https",
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "backgroundColor": "#13030e",
+    "allowMixedContent": false
+  }
+}

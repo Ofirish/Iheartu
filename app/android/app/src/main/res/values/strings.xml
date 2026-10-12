@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">I heart U</string>
+    <string name="title_activity_main">I heart U</string>
+    <string name="package_name">com.ofirish.iheartu</string>
+    <string name="custom_url_scheme">com.ofirish.iheartu</string>
+</resources>

@@ -89,6 +89,15 @@ body {
 #inbox .empty { opacity: .55; text-align: center; }
 .mail { position: fixed; left: calc(50% - 40px); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 20; width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1.5px solid rgba(255, 208, 234, 0.55); color: var(--blush); background: rgba(19, 3, 14, 0.4); display: flex; align-items: center; justify-content: center; opacity: 0.7; touch-action: manipulation; }
 .mail svg { width: 15px; height: 15px; }
+.snd { position: fixed; left: calc(50% + 40px); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 20; width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1.5px solid rgba(255, 208, 234, 0.55); color: var(--blush); background: rgba(19, 3, 14, 0.4); display: flex; align-items: center; justify-content: center; opacity: 0.7; touch-action: manipulation; }
+.snd svg { width: 15px; height: 15px; }
+.snd::after { content: ""; position: absolute; inset: -8px; }
+.snd .x { display: none; }
+.snd.off .x { display: inline; }
+.snd.off .w { display: none; }
+.snd.off { opacity: .45; }
+#joinPanel .err { color: #ff9ab8; font-size: .85rem; margin: 8px 0 0; }
+#joinPanel .err[hidden] { display: none; }
 .mail::after { content: ""; position: absolute; inset: -8px; }
 .mail.unread { opacity: 1; border-color: var(--rose); }
 .mail.unread::before { content: ""; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: var(--rose); box-shadow: 0 0 8px var(--rose); }
@@ -265,6 +274,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <ul id="inboxList"></ul>
   <div class="row"><button type="button" id="inboxClear">Clear</button><button type="button" id="inboxClose">Close</button></div>
 </div>
+<div class="panel" id="joinPanel" hidden>
+  <p>Join your partner's heart: paste the room link they sent you (it ends with # and some letters).</p>
+  <input id="joinInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Room link" placeholder="https://ofirish.github.io/Iheartu/#…">
+  <p class="err" id="joinErr" hidden>That doesn't look like a room link.</p>
+  <div class="row"><button type="button" id="joinGo">Join</button><button type="button" id="joinNew">Start a new heart</button></div>
+</div>
 <div class="panel" id="annivPanel" hidden>
   <p>Our anniversary. It's saved for this room, so you both see it.</p>
   <input id="annivInput" type="date" aria-label="Anniversary date">
@@ -272,6 +287,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 </div>
 <div class="split" id="split" hidden></div>
 <button class="mail" id="mail" type="button" aria-label="Messages you may have missed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>
+<button class="snd" id="snd" type="button" aria-label="Sound on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7"/><path class="x" d="m16 9 5 6m0-6-5 6"/></svg></button>
 <a class="info" id="info" href="help.html" target="_blank" rel="noopener" aria-label="Help: everything the heart can do">i</a>
 <div class="hotl" id="hotl"></div>
 <div class="hot" id="hot"></div>
@@ -763,10 +779,71 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     "If you were a triangle, you'd be acute one."
   ];
   var FX_OK = { luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
+  // ---- Vibration and sound ----
+  // Inside the Android app the phone's own vibration motor is used (no "touch the page first" rule).
+  var CAP = window.Capacitor;
+  var isApp = !!(CAP && typeof CAP.isNativePlatform === 'function' && CAP.isNativePlatform());
+  function nativeHaptics() { return isApp && CAP.Plugins && CAP.Plugins.Haptics; }
+  function vib(pat) {
+    var H = nativeHaptics();
+    if (H) {
+      var list = typeof pat === 'number' ? [pat] : pat, at = 0;
+      for (var i = 0; i < list.length; i += 2) {
+        (function (d, when) {
+          setTimeout(function () { try { H.vibrate({ duration: d }).catch(function () {}); } catch (e) {} }, when);
+        })(list[i], at);
+        at += list[i] + (list[i + 1] || 0);
+      }
+      return true;
+    }
+    try { return navigator.vibrate ? !!navigator.vibrate(pat) : false; } catch (e) { return false; }
+  }
   function buzz(pat, remote) {
     if (remote && nightNow.me) return;
-    try { if (navigator.vibrate) navigator.vibrate(pat); } catch (e) {}
+    vib(pat);
   }
+  // Little synthesized sounds, no files. Quiet at night for you, and the speaker button mutes them.
+  var actx = null, soundOn = lsGet('hb-sound') !== '0';
+  function audio() {
+    if (!actx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { actx = new AC(); } catch (e) { return null; }
+    }
+    if (actx.state === 'suspended') { try { actx.resume(); } catch (e) {} }
+    return actx;
+  }
+  function tone(a, type, f0, f1, t0, dur, vol) {
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur * 0.8);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function sfx(kind) {
+    if (!soundOn || nightNow.me) return;
+    var a = audio();
+    if (!a || a.state !== 'running') return;
+    var t = a.currentTime + 0.01;
+    if (kind === 'beat') {          // lub-dub
+      tone(a, 'sine', 170, 70, t, 0.16, 0.5); tone(a, 'triangle', 340, 140, t, 0.08, 0.08);
+      tone(a, 'sine', 150, 60, t + 0.2, 0.14, 0.35);
+    } else if (kind === 'love') {   // rising chime
+      [880, 1108.7, 1318.5, 1760].forEach(function (f, i) { tone(a, 'sine', f, f, t + i * 0.13, 1.1, 0.16); });
+    } else if (kind === 'note') {   // bell
+      tone(a, 'sine', 1568, 1568, t, 1.6, 0.2); tone(a, 'sine', 2349, 2349, t, 1.0, 0.07); tone(a, 'sine', 784, 784, t, 1.2, 0.08);
+    } else if (kind === 'kiss') {   // pop
+      tone(a, 'sine', 500, 1300, t, 0.09, 0.25); tone(a, 'sine', 600, 1500, t + 0.12, 0.09, 0.2);
+    } else if (kind === 'msg') {    // soft ding
+      tone(a, 'sine', 1318.5, 1318.5, t, 0.9, 0.14); tone(a, 'sine', 1975.5, 1975.5, t + 0.1, 0.9, 0.08);
+    }
+  }
+  // browsers only allow sound after a touch: wake the audio on the first one
+  window.addEventListener('pointerdown', function () { if (soundOn) audio(); }, true);
   function runFx(k, d, remote) {
     var nowS = performance.now() / 1000;
     if (k === 'kiss') kissBurst(d.u || 0, d.v || 0);
@@ -1015,6 +1092,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     noteBox.textContent = '💌 ' + item.n;
     noteBox.hidden = false;
     buzz([60, 60, 60], true);
+    sfx('note');
     if (item.nid) {
       sendReliable({ t: 'noteread', nid: item.nid });
       if (useFb && /^[a-z0-9]{1,16}$/.test(item.nid)) { try { fbReq('DELETE', '/notes/' + item.nid).catch(function () {}); } catch (e) {} }
@@ -1064,7 +1142,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     burst(cx + u * S, cy + v * S, mine ? MINE : THEIRS);
     // no buzzing a sleeping phone
     if (mine || !nightNow.me) {
-      try { if (navigator.vibrate) navigator.vibrate(mine ? 25 : 70); } catch (e) {}
+      vib(mine ? 25 : 70);
     }
   }
 
@@ -1139,7 +1217,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     loveEl.textContent = text || 'I love you';
     loveEl.classList.toggle('grey', !!o.grey);
     boost = 0.16;
-    if (!o.quiet && !nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
+    if (!o.quiet && !nightNow.me) vib([90, 60, 90, 60, 180]);
+    if (!o.grey) sfx('love');
   }
   function maybeLove() {
     var nowMs = performance.now();
@@ -1371,6 +1450,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (ok.test(h)) { lsSet(ROOM_KEY, h); return h; }
     var saved = lsGet(ROOM_KEY) || '';
     if (ok.test(saved)) { setHash(saved); return saved; }
+    freshRoom = true;
     // New room: 16 random characters from a 31-letter alphabet (about 79 bits), no modulo bias.
     var alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
     var code = '';
@@ -1385,6 +1465,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     setHash(code);
     return code;
   }
+  var freshRoom = false;
   var room = getRoom();
   // a hard refresh adds ?r=... to bypass cached copies; keep the address clean afterwards
   if (/[?&]r=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + (NSQ ? '?' + NSQ : '') + location.hash); } catch (e) {} }
@@ -1459,6 +1540,40 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     markMail();
     inboxEl.hidden = false;
   }
+  // sound on/off (saved on this phone)
+  var sndBtn = document.getElementById('snd');
+  function markSnd() { sndBtn.classList.toggle('off', !soundOn); sndBtn.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off'); }
+  markSnd();
+  sndBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    soundOn = !soundOn;
+    lsSet('hb-sound', soundOn ? '1' : '0');
+    markSnd();
+    if (soundOn) { audio(); setTimeout(function () { sfx('msg'); }, 60); }
+    showToast(soundOn ? 'Sound on' : 'Sound off', 1500);
+  });
+  // joining an existing room by pasting its link (the Android app starts without one)
+  var joinPanel = document.getElementById('joinPanel');
+  var joinInput = document.getElementById('joinInput');
+  function roomFromText(t) {
+    t = String(t || '').trim();
+    var m = /#([a-z0-9]{6,32})\s*$/i.exec(t) || /^([a-z0-9]{6,32})$/i.exec(t);
+    return m ? m[1].toLowerCase() : '';
+  }
+  function openJoin() { joinInput.value = ''; document.getElementById('joinErr').hidden = true; joinPanel.hidden = false; }
+  document.getElementById('joinGo').addEventListener('click', function () {
+    var code = roomFromText(joinInput.value);
+    if (!code) { document.getElementById('joinErr').hidden = false; return; }
+    joinPanel.hidden = true;
+    if (code === room) return;
+    lsSet(ROOM_KEY, code);
+    location.hash = code;
+    location.reload();
+  });
+  document.getElementById('joinNew').addEventListener('click', function () { joinPanel.hidden = true; });
+  if (freshRoom && isApp && !NS) openJoin();
+  function roomLink() { return 'https://ofirish.github.io/Iheartu/#' + room; }
+
   markMail();
   mailBtn.addEventListener('click', function (e) { e.stopPropagation(); if (inboxEl.hidden) openInbox(); else inboxEl.hidden = true; });
   document.getElementById('inboxClose').addEventListener('click', function () { inboxEl.hidden = true; });
@@ -1480,6 +1595,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     toastTimer = setTimeout(showSticky, ms || 5200);
   }
   function showMsg(txt) {
+    sfx('msg');
     stickyQ.push(txt);
     if (stickyQ.length > 8) stickyQ.shift();
     showSticky();
@@ -1655,6 +1771,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     } else if (m.t === 'touch') {
       // a press that arrives while this page is hidden still counts as "loved while away" (the history replay later skips it as already seen)
       if (m.d === 1 && document.visibilityState === 'hidden') { pending++; savePending(); }
+      if (m.d === 1) sfx('beat');
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
       maybeLove();
@@ -1663,7 +1780,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     } else if (m.t === 'kiss') {
       if (m.k === 'bg') startKissRain(tn / 1000);
       else kissBurst(clampUnit(m.u), clampUnit(m.v));
-      if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([40, 40, 40]); } catch (e) {} }
+      if (!nightNow.me) vib([40, 40, 40]);
+      sfx('kiss');
     } else if (m.t === 'hold') {
       rp.holdAt = tn;
       maybeLove();
@@ -2132,7 +2250,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -2174,6 +2292,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'luv') runFx('luvrain', {}, false);
     else if (a === 'split') { closeAdmin(); openSplit(); }
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
+    else if (a === 'link') {
+      var lnk = roomLink();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lnk).then(function () { showToast('Room link copied'); }, function () { window.prompt('Copy this link', lnk); });
+      else window.prompt('Copy this link', lnk);
+    }
+    else if (a === 'join') openJoin();
     else if (a === 'relay') {
       showToast('Checking the relay…');
       var t0 = Date.now();
@@ -2185,7 +2309,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       } catch (e) { showToast('Relay: ' + e.message, 9000); }
     }
     else if (a === 'buzz') {
-      if (!navigator.vibrate) showToast("This browser can't vibrate");
+      if (nativeHaptics()) { vib([250, 120, 250]); showToast('Buzz sent (app vibration)'); }
+      else if (!navigator.vibrate) showToast("This browser can't vibrate");
       else showToast(navigator.vibrate(250) ? 'Buzz sent' : 'Buzz blocked: tap the page first');
     }
     else if (a === 'reset') {

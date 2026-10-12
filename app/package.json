@@ -1,0 +1,17 @@
+{
+  "name": "iheartu-android",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Android shell for the shared heart. It loads https://ofirish.github.io/Iheartu/ so page updates arrive without reinstalling.",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
