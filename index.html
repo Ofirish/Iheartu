@@ -74,7 +74,12 @@ body {
 .caption p { margin: 0; }
 .hint { font-size: 1.5rem; color: var(--blush); letter-spacing: 0.02em; text-shadow: 0 0 18px rgba(255, 79, 163, 0.7); }
 .status { margin-top: 6px; min-height: 1.4em; font-size: 1.05rem; color: var(--blush); opacity: 0.75; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.status { pointer-events: auto; touch-action: manipulation; padding: 6px 14px; user-select: none; -webkit-user-select: none; }
 .status:empty { visibility: hidden; }
+#ach ul { list-style: none; margin: 0 0 6px; padding: 0; text-align: left; font-size: 0.98rem; max-height: 46vh; overflow: auto; }
+#ach li { padding: 6px 2px; border-bottom: 1px solid rgba(255,130,190,.15); }
+#ach li.lock { opacity: .45; }
+#ach small { opacity: .6; }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--deep); flex: none; }
 .status.together::before { background: var(--rose); box-shadow: 0 0 10px 2px var(--rose); }
 .note { margin-top: 2px; font-size: 0.95rem; color: var(--blush); opacity: 0.6; }
@@ -227,6 +232,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeCancel">Cancel</button></div>
 </div>
 <div class="panel notebox" id="notebox" hidden></div>
+<div class="panel" id="ach" hidden>
+  <p>Achievements</p>
+  <ul id="achList"></ul>
+  <div class="row"><button type="button" id="achClose">Close</button></div>
+</div>
 <div class="panel" id="annivPanel" hidden>
   <p>Your anniversary</p>
   <input id="annivInput" type="date" aria-label="Anniversary date">
@@ -795,7 +805,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   // Streak: days you both touched the heart
   function dayKey(ts) { var t = new Date(ts); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }
   function loadDays(name) { var o = {}; (lsGet(K(name)) || '').split(',').forEach(function (x) { if (x) o[x] = 1; }); return o; }
-  var daysMe = loadDays('daysme'), daysThem = loadDays('daysthem');
+  var daysMe = {}, daysThem = {};   // loaded once the room is known (initPersisted)
   function markDay(who, ts) {
     var o = who === 'me' ? daysMe : daysThem, dk = dayKey(ts);
     if (o[dk]) return;
@@ -814,6 +824,57 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       showToast('🔥 ' + n + ' days in a row');
     }
   }
+
+  // Achievements: a hidden count of hearts you have sent
+  var ACH = [20, 50, 100, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+  var sentCount = 0;
+  var ach = {};
+  function countSent() {
+    sentCount++;
+    lsSet(K('sent'), sentCount);
+    for (var i = 0; i < ACH.length; i++) {
+      var m = ACH[i];
+      if (sentCount >= m && !ach[m]) {
+        ach[m] = Date.now();
+        lsSet(K('ach'), JSON.stringify(ach));
+        showToast('\uD83C\uDFC6 ' + m.toLocaleString('en-US') + ' hearts sent!', 10000);
+      }
+    }
+  }
+  var achEl = document.getElementById('ach');
+  var achList = document.getElementById('achList');
+  function openAch() {
+    achList.textContent = '';
+    var locked = 0;
+    ACH.forEach(function (m) {
+      if (!ach[m]) { locked++; return; }
+      var li = document.createElement('li');
+      li.textContent = '\uD83C\uDFC6 ' + m.toLocaleString('en-US') + ' hearts sent ';
+      var sm = document.createElement('small');
+      sm.textContent = new Date(ach[m]).toLocaleDateString();
+      li.appendChild(sm);
+      achList.appendChild(li);
+    });
+    [7, 30, 100, 365].forEach(function (n) {
+      if (!lsGet(K('flame' + n))) return;
+      var li = document.createElement('li');
+      li.textContent = '\uD83D\uDD25 ' + n + ' days in a row';
+      achList.appendChild(li);
+    });
+    if (locked) {
+      var lk = document.createElement('li');
+      lk.className = 'lock';
+      lk.textContent = '\uD83D\uDD12 ' + locked + ' more to discover';
+      achList.appendChild(lk);
+    }
+    achEl.hidden = false;
+  }
+  document.getElementById('achClose').addEventListener('click', function () { achEl.hidden = true; });
+  var statusTapAt = -1e9;
+  statusEl.addEventListener('click', function () {
+    var now = performance.now();
+    if (now - statusTapAt < 450) { statusTapAt = 0; openAch(); } else statusTapAt = now;
+  });
 
   // Hidden notes
   var noteQueue = [], noteShowing = false;
@@ -1182,6 +1243,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var topic = 'heartbeat-' + room;
   function K(n) { return 'hb-' + room + '-' + n; }
   var paired = lsGet(K('paired')) === '1';
+  // saved per-room data, read now that the room is known
+  function initPersisted() {
+    daysMe = loadDays('daysme');
+    daysThem = loadDays('daysthem');
+    sentCount = parseInt(lsGet(K('sent')), 10) || 0;
+    try { ach = JSON.parse(lsGet(K('ach')) || '{}') || {}; } catch (e) { ach = {}; }
+  }
+  initPersisted();
 
   var me = Math.random().toString(36).slice(2, 10);      // this open page, to ignore our own echo
   var did = lsGet('hb-did');                              // this phone, to tell your touches from theirs in history
@@ -1197,11 +1266,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
   // ---- Messages: toast, status ----
   var toastTimer = 0;
-  function showToast(txt) {
+  function showToast(txt, ms) {
     toastEl.textContent = txt;
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 5200);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 5200);
   }
   function showAway(n) {
     if (!(n >= 1)) return;   // never say "0 times"
@@ -1389,7 +1458,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var v = (e.clientY - cy) / S;
     lastTouchAt = Math.max(lastTouchAt, Date.now());
     lsSet(K('lasttouch'), lastTouchAt);
-    if (isDown) { markDay('me', Date.now()); checkStreak(); }
+    if (isDown) { markDay('me', Date.now()); checkStreak(); countSent(); }
     if (pending > 0) { showAway(pending); pending = 0; savePending(); }
     addTouch(u, v, true);
     send({ t: 'touch', d: isDown ? 1 : 0, u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
@@ -1622,7 +1691,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1654,6 +1723,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'good') runFx('good', {}, true);
     else if (a === 'mmode') startM();
     else if (a === 'note') openCompose();
+    else if (a === 'ach') openAch();
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
