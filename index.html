@@ -382,6 +382,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var settled = false;
   var connected = false;
   var peers = {};
+  var peerDev = {};
   var PEER_TTL = 100000;
 
   // "I love you" state
@@ -994,7 +995,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     noteBox.textContent = '💌 ' + item.n;
     noteBox.hidden = false;
     buzz([60, 60, 60], true);
-    if (item.nid) sendReliable({ t: 'noteread', nid: item.nid });
+    if (item.nid) {
+      sendReliable({ t: 'noteread', nid: item.nid });
+      if (useFb && /^[a-z0-9]{1,16}$/.test(item.nid)) { try { fbReq('DELETE', '/notes/' + item.nid).catch(function () {}); } catch (e) {} }
+    }
   }
   noteBox.addEventListener('click', function () { noteBox.hidden = true; noteShowing = false; showNextNote(); });
   function openCompose() { composeInput.value = ''; composeEl.hidden = false; try { composeInput.focus(); } catch (e) {} }
@@ -1087,7 +1091,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function livePeers() {
     var now = Date.now(), n = 0;
-    for (var id in peers) if (now - peers[id] < PEER_TTL) n++;
+    for (var id in peers) if (now - peers[id] < PEER_TTL && peerDev[id] !== did) n++;   // your own other tabs don't count
     return n;
   }
   function effPeer() {
@@ -1332,6 +1336,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   // The room code lives in the link after the #. Each phone also remembers it, so the home-screen app
   // reopens the same room every time, with no expiry.
   var RELAY = 'https://ntfy.sh';
+  // Main relay: a Firebase Realtime Database (free plan). Empty = use ntfy.sh only.
+  // ntfy.sh stays as the automatic fallback when Firebase can't be reached.
+  var FB_URL = '';
+  if (typeof window.HB_FB === 'string') FB_URL = window.HB_FB;
+  if (/[?&]relay=ntfy/.test(location.search)) FB_URL = '';
+  var useFb = !!FB_URL;
+  if (useFb) PEER_TTL = 60000;
   var ROOM_KEY = 'heartbeat-room';
   function setHash(code) { try { history.replaceState(null, '', '#' + code); } catch (e) { location.hash = code; } }
   function getRoom() {
@@ -1449,6 +1460,23 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (c === 429) busyUntil = Date.now() + 20000;
     return c;
   }
+  function fbReq(method, path, body, keep) {
+    var init = { method: method, keepalive: !!keep };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    return fetch(FB_URL + '/rooms/' + topic + path + '.json', init);
+  }
+  // One post to the relay. On Firebase: lasting things (presses, notes, receipts, anniversary) are stored,
+  // passing things (moves, holds, effects, presence) overwrite this page's single "live" slot.
+  function relayPost(obj) {
+    var js = JSON.stringify(obj);
+    if (!useFb) return fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: js });
+    var e = { m: js, ts: { '.sv': 'timestamp' } };
+    if (obj.t === 'note' && /^[a-z0-9]{1,16}$/.test(obj.nid || '')) return fbReq('PUT', '/notes/' + obj.nid, e);
+    if (obj.t === 'anniv') return fbReq('PUT', '/anniv', e);
+    if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread') return fbReq('POST', '/msgs', e);
+    e.q = Math.random().toString(36).slice(2, 10);
+    return fbReq('PUT', '/live/' + me, e);
+  }
   function sendReliable(obj, onDone) {
     if (splitOpen) { if (onDone) onDone(false, 0); return; }
     if (NS) { send(obj); if (onDone) onDone(true, 200); return; }
@@ -1464,7 +1492,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       };
       lastPostAt = Date.now();
       try {
-        fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(obj) }).then(function (r) {
+        relayPost(obj).then(function (r) {
           code = noteCode(r);
           if (r && r.ok === false) failed(); else finish(true);
         }, function () { code = -1; failed(); });
@@ -1482,9 +1510,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     var chatter = obj.t === 'hi' || obj.t === 'hold' || (obj.t === 'touch' && obj.d === 0);
     if (chatter && (reliableBusy > 0 || Date.now() < busyUntil)) return;
+    if (useFb && obj.t === 'hi' && document.visibilityState === 'hidden') return;   // a hidden page is not "here"
     lastPostAt = Date.now();
     try {
-      fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: JSON.stringify(obj) }).then(noteCode, function () {});
+      relayPost(obj).then(noteCode, function () {});
     } catch (e) {}
   }
 
@@ -1526,6 +1555,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var now = Date.now();
     var isNew = !peers[m.id] || now - peers[m.id] > PEER_TTL;
     peers[m.id] = now;
+    peerDev[m.id] = m.dv;
     var rp = remote[m.id] || (remote[m.id] = { downAt: 0, holdAt: 0, upAt: 0 });
     var tn = performance.now();
     if (m.t === 'hi') {
@@ -1550,16 +1580,19 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  function historyDone() {
+    savePending();
+    checkStreak();
+    showNextNote();
+    lastSeenAt = Date.now();
+    saveSeen();
+  }
   function loadHistory(done) {
     var maxT = 0, finished = false;
     function finish() {
       if (finished) return;
       finished = true;
-      savePending();
-      checkStreak();
-      showNextNote();
-      lastSeenAt = Date.now();
-      saveSeen();
+      historyDone();
       done(maxT);
     }
     if (!window.fetch) { finish(); return; }
@@ -1593,7 +1626,102 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     };
   }
 
+  // ---- Firebase stream ----
+  function fbEntry(id, e, live) {
+    if (!e || typeof e.m !== 'string') return;
+    ingest({ event: 'message', id: id, time: (Number(e.ts) || Date.now()) / 1000, message: e.m }, live);
+  }
+  function fbSnapshot(data) {
+    data = data && typeof data === 'object' ? data : {};
+    var list = [], msgs = data.msgs || {}, notes = data.notes || {}, lv = data.live || {};
+    Object.keys(msgs).forEach(function (k) { list.push(['m' + k, msgs[k]]); });
+    Object.keys(notes).forEach(function (k) { list.push(['n' + k, notes[k]]); });
+    if (data.anniv) list.push(['a' + (data.anniv.ts || 0), data.anniv]);
+    list.sort(function (a, b) { return ((a[1] && a[1].ts) || 0) - ((b[1] && b[1].ts) || 0); });
+    list.forEach(function (x) { fbEntry(x[0], x[1], false); });
+    historyDone();
+    // who is in the room right now
+    var now = Date.now();
+    Object.keys(lv).forEach(function (k) {
+      var e = lv[k];
+      if (!e || k === me || typeof e.m !== 'string' || now - (Number(e.ts) || 0) > PEER_TTL) return;
+      try {
+        var m = JSON.parse(e.m);
+        ingest({ event: 'message', id: 'h' + k + (e.q || '') + now, time: now / 1000, message: JSON.stringify({ t: 'hi', id: m.id, dv: m.dv, z: m.z }) }, true);
+      } catch (er) {}
+    });
+    // tidy up: presses older than two days, notes older than two weeks, slots of pages long gone
+    var cut = now - 48 * 3600000, old = {}, n = 0;
+    Object.keys(msgs).forEach(function (k) { if (!msgs[k] || (Number(msgs[k].ts) || 0) < cut) { old['msgs/' + k] = null; n++; } });
+    Object.keys(notes).forEach(function (k) { if (!notes[k] || (Number(notes[k].ts) || 0) < now - 14 * 86400000) { old['notes/' + k] = null; n++; } });
+    Object.keys(lv).forEach(function (k) { if (!lv[k] || (Number(lv[k].ts) || 0) < now - 86400000) { old['live/' + k] = null; n++; } });
+    if (n) { try { fbReq('PATCH', '', old).catch(function () {}); } catch (e) {} }
+  }
+  function fbChange(path, data) {
+    var p = String(path || '').split('/').filter(Boolean);
+    if (!p.length) { fbSnapshot(data); return; }
+    if (p.length === 1) {   // a whole branch at once
+      if (data && typeof data === 'object' && p[0] !== 'anniv') Object.keys(data).forEach(function (k) { fbChange('/' + p[0] + '/' + k, data[k]); });
+      else if (p[0] === 'anniv' && data) fbEntry('a' + (data.ts || 0), data, true);
+      return;
+    }
+    var k = p[1];
+    if (p[0] === 'live') {
+      if (p.length > 2) return;
+      if (!data) { if (peers[k]) { delete peers[k]; delete remote[k]; } return; }   // that page left
+      if (k !== me) fbEntry('l' + k + (data.q || data.ts), data, true);
+    } else if (p[0] === 'msgs' && data && p.length === 2) fbEntry('m' + k, data, true);
+    else if (p[0] === 'notes' && data && p.length === 2) fbEntry('n' + k, data, true);
+  }
+  function fallbackToNtfy() {
+    if (!useFb) return;
+    useFb = false;
+    PEER_TTL = 100000;
+    if (es) { try { es.close(); } catch (e) {} es = null; }
+    startSession();
+  }
+  function openFb() {
+    if (es) { try { es.close(); } catch (e) {} es = null; }
+    if (!window.EventSource) { fallbackToNtfy(); return; }
+    var src = es = new EventSource(FB_URL + '/rooms/' + topic + '.json');
+    var gotFirst = false;
+    var failTimer = setTimeout(function () { if (!gotFirst && es === src) fallbackToNtfy(); }, 9000);
+    src.onopen = function () { if (es !== src) return; connected = true; updateStatus(); };
+    src.onerror = function () { if (es !== src) return; connected = false; updateStatus(); };
+    function onEvent(kind) {
+      return function (ev) {
+        if (es !== src) return;
+        var d;
+        try { d = JSON.parse(ev.data); } catch (e) { return; }
+        if (!d || typeof d.path !== 'string') return;
+        if (!gotFirst) {
+          gotFirst = true;
+          clearTimeout(failTimer);
+          connected = true;
+          if (d.path === '/' && kind === 'put') fbSnapshot(d.data); else historyDone();
+          send({ t: 'hi' });
+          updateStatus();
+          if (d.path === '/' && kind === 'put') return;
+        }
+        if (kind === 'patch') {
+          var base = d.path.replace(/\/$/, '');
+          if (d.data && typeof d.data === 'object') Object.keys(d.data).forEach(function (k) { fbChange(base + '/' + k, d.data[k]); });
+        } else fbChange(d.path, d.data);
+        updateStatus();
+      };
+    }
+    src.addEventListener('put', onEvent('put'));
+    src.addEventListener('patch', onEvent('patch'));
+    src.addEventListener('cancel', function () { if (es === src) fallbackToNtfy(); });
+  }
+  function fbLeave() {
+    if (!useFb || NS) return;
+    // keepalive lets it finish while the page closes; some browsers refuse it here, so try plainly too
+    try { fbReq('DELETE', '/live/' + me, undefined, true).catch(function () { try { fbReq('DELETE', '/live/' + me).catch(function () {}); } catch (e) {} }); } catch (e) {}
+  }
+
   function startSession() {
+    if (useFb && !NS) { openFb(); return; }
     if (NS) {   // test pane: no relay, no history, just the other pane
       splitChannel();
       connected = true;
@@ -1608,7 +1736,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   startSession();
   // presence ping, only when nothing else was posted lately (every post already tells the other phone you are here)
-  setInterval(function () { if (connected && document.visibilityState === 'visible' && Date.now() - lastPostAt > 40000) send({ t: 'hi' }); }, 10000);
+  setInterval(function () { if (connected && document.visibilityState === 'visible' && Date.now() - lastPostAt > (useFb ? 25000 : 40000)) send({ t: 'hi' }); }, 10000);
 
   if (!NS && 'serviceWorker' in navigator && location.protocol === 'https:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
@@ -1667,6 +1795,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (document.visibilityState === 'hidden') {
       lastSeenAt = Date.now();
       saveSeen();
+      fbLeave();
     } else {
       wake();
       // back after a while: catch up on what you missed
@@ -1674,7 +1803,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       else if (connected) send({ t: 'hi' });
     }
   });
-  window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); });
+  window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); fbLeave(); });
 
   // ---- Gestures ----
   var ptrs = {};
@@ -1825,7 +1954,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       }
     }
     if (!pressed) return;
-    if (now - lastSend < 1000) return;
+    if (now - lastSend < (useFb ? 300 : 1000)) return;
     lastSend = now;
     touch(e, false);
   });
@@ -1954,9 +2083,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       showToast('Checking the relay…');
       var t0 = Date.now();
       try {
-        fetch(RELAY + '/' + topic + '?cache=no', { method: 'POST', body: JSON.stringify(stamp({ t: 'hi' })) }).then(function (r) {
+        relayPost(stamp({ t: 'hi' })).then(function (r) {
           var c = noteCode(r);
-          showToast(c === 429 ? 'Relay: 429, too many messages from this network right now' : 'Relay answered ' + c + (r.ok ? ' OK' : '') + ' in ' + (Date.now() - t0) + ' ms', 9000);
+          showToast((useFb ? 'Firebase' : 'ntfy') + (c === 429 ? ': 429, too many messages from this network right now' : ' answered ' + c) + (r.ok ? ' OK' : '') + ' in ' + (Date.now() - t0) + ' ms', 9000);
         }, function (e) { showToast("Relay: couldn't reach it (" + (e && e.message || 'network error') + ')', 9000); });
       } catch (e) { showToast('Relay: ' + e.message, 9000); }
     }
