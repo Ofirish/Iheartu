@@ -127,6 +127,34 @@ body {
 
 /* Secret admin: hot corner, passphrase box, panel */
 .hot { position: fixed; top: 0; left: 0; width: 64px; height: calc(64px + env(safe-area-inset-top, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
+.love.grey { background: linear-gradient(100deg, #e8e8e8 0%, #8a8a8a 50%, #e8e8e8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 1px 2px rgba(0,0,0,.8)) drop-shadow(0 0 12px rgba(200,200,200,.5)); }
+.gold {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 44px); left: 0; right: 0; padding-inline: 24px; text-align: center;
+  pointer-events: none; opacity: 0; transition: opacity 1.2s ease;
+  font-family: var(--font-display); font-style: italic; font-weight: 500; font-size: 1.5rem;
+  color: #fff3cf; text-shadow: 0 0 10px rgba(255, 190, 70, 0.95), 0 0 26px rgba(255, 150, 40, 0.7);
+}
+.gold.show { opacity: 1; }
+.whisky {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); transform: translateX(-50%); z-index: 35;
+  padding: 12px 22px; border-radius: 999px; text-decoration: none; white-space: nowrap;
+  font-family: var(--font-ui); font-size: 1rem; color: #f4e6cf; background: rgba(40, 30, 22, 0.88); border: 1px solid #c79b5a;
+  box-shadow: 0 0 18px rgba(199, 155, 90, 0.35);
+}
+.whisky[hidden] { display: none; }
+.panel {
+  position: fixed; left: 50%; top: 36%; transform: translate(-50%, -50%); z-index: 40; width: min(88vw, 360px);
+  padding: 18px; border-radius: 18px; background: rgba(26, 6, 20, 0.94); border: 1px solid rgba(255, 130, 190, 0.4);
+  box-shadow: 0 0 30px rgba(255, 79, 163, 0.3); color: #ffe9f7; font-family: var(--font-ui); text-align: center;
+}
+.panel[hidden] { display: none; }
+.panel p { margin: 0 0 10px; font-size: 0.95rem; }
+.panel input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,130,190,.5); background: #13030e; color: #ffe9f7; font-size: 1rem; font-family: inherit; }
+.panel .row { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.panel button { padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,130,190,.6); background: rgba(255,79,163,.18); color: #ffe9f7; font-family: inherit; font-size: .95rem; }
+.notebox { font-family: var(--font-display); font-style: italic; font-size: 1.5rem; line-height: 1.3; text-wrap: balance; }
+.notebox::after { content: "tap to close"; display: block; margin-top: 12px; font-family: var(--font-ui); font-style: normal; font-size: .75rem; opacity: .6; }
+.hotl { position: fixed; left: 0; bottom: 0; width: 64px; height: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
 .refresh { position: fixed; right: 0; bottom: 0; width: 64px; height: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
 .gate { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; z-index: 31; }
 .gate[hidden] { display: none; }
@@ -191,6 +219,20 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <p class="note" id="note"></p>
   <button class="invite" id="invite" type="button">Invite someone</button>
 </div>
+<div class="gold" id="gold"></div>
+<a class="whisky" id="whisky" href="https://www.google.com/search?q=order+japanese+whisky+online" target="_blank" rel="noopener" hidden>Order Japanese whiskey</a>
+<div class="panel" id="compose" hidden>
+  <p>Hide a note for them. They see it the next time they open the heart.</p>
+  <input id="composeInput" type="text" maxlength="140" autocomplete="off" aria-label="Note">
+  <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeCancel">Cancel</button></div>
+</div>
+<div class="panel notebox" id="notebox" hidden></div>
+<div class="panel" id="annivPanel" hidden>
+  <p>Your anniversary</p>
+  <input id="annivInput" type="date" aria-label="Anniversary date">
+  <div class="row"><button type="button" id="annivSave">Save</button><button type="button" id="annivClear">Clear</button><button type="button" id="annivClose">Close</button></div>
+</div>
+<div class="hotl" id="hotl"></div>
 <div class="hot" id="hot"></div>
 <div class="refresh" id="refresh"></div>
 <div class="gate" id="gate" hidden><input id="gateInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Passphrase"></div>
@@ -245,10 +287,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
   // Heart outline in its own units: x -16..16, y -14.5..14.5, y pointing down, centred on 0,0.
   var hp = new Path2D();
+  var hpts = [];
   for (var i = 0; i <= 180; i++) {
     var t = i / 180 * Math.PI * 2;
     var hx = 16 * Math.pow(Math.sin(t), 3);
     var hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) - 2.5;
+    hpts.push([hx, hy]);
     if (i === 0) hp.moveTo(hx, hy); else hp.lineTo(hx, hy);
   }
   hp.closePath();
@@ -285,6 +329,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var kisses = [];
   var kissUntil = 0;   // background kisses run until this time (seconds)
   var kissNext = 0;
+  var KISS = '💋';
+  var EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  var pixelUntil = 0, binUntil = 0, warpT0 = -99, confettiUntil = 0, confettiAcc = 0;
+  var stag = null;            // {t0, dir}
+  var mT0 = -99;              // M mode (this phone only)
+  var annivForce = false, annivToday = false;
+  var warpStars = [];
+  for (var ws0 = 0; ws0 < 120; ws0++) warpStars.push({ a: Math.random() * 6.283, r0: Math.random() * 0.06, sp: 0.5 + Math.random() * 0.9 });
   var boost = 0;
   var last = 0;
   var phase = 0;
@@ -450,17 +502,19 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
   // ---- Kisses: a double tap sends a few up from the heart; the secret sequence fills the background for 10 s ----
   var KISS_BG_SECONDS = 10;
-  function addKiss(x, y, big) {
+  function addKiss(x, y, big, g, fall, sz) {
     var now = performance.now() / 1000;
     var a = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
     var sp = big ? 0 : 50 + Math.random() * 90;
+    var vx = Math.cos(a) * sp, vy = Math.sin(a) * sp - (big ? 12 + Math.random() * 14 : 0);
+    if (fall) { vx = (Math.random() - 0.5) * 50; vy = 70 + Math.random() * 110; }
     kisses.push({
-      x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (big ? 12 + Math.random() * 14 : 0),
-      rot: (Math.random() - 0.5) * 0.9, vr: (Math.random() - 0.5) * 0.6,
-      size: big ? 22 + Math.random() * 40 : 26 + Math.random() * 22,
-      t0: now, max: big ? 2.4 + Math.random() * 1.4 : 1.6 + Math.random() * 0.8
+      x: x, y: y, vx: vx, vy: vy, g: g || KISS,
+      rot: (Math.random() - 0.5) * 0.9, vr: (Math.random() - 0.5) * 0.9,
+      size: sz || (big ? 22 + Math.random() * 40 : 26 + Math.random() * 22),
+      t0: now, max: fall ? 3 + Math.random() * 1.5 : big ? 2.4 + Math.random() * 1.4 : 1.6 + Math.random() * 0.8
     });
-    if (kisses.length > 170) kisses.shift();
+    if (kisses.length > 240) kisses.shift();
   }
   function kissBurst(u, v) {
     var px = cx + u * S, py = cy + v * S;
@@ -477,6 +531,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (now < kissUntil) {
       kissNext += dt * 16;
       while (kissNext >= 1) { kissNext -= 1; addKiss(Math.random() * W, Math.random() * H, true); }
+    }
+    if (now < confettiUntil) {
+      confettiAcc += dt * 38;
+      var CG = ['\uD83D\uDC96', '\uD83D\uDC97', '\uD83D\uDC95', '\uD83D\uDC98', '\uD83D\uDC9D', '\u2728'];
+      while (confettiAcc >= 1) { confettiAcc -= 1; addKiss(Math.random() * W, -30, false, CG[Math.floor(Math.random() * CG.length)], true, 20 + Math.random() * 22); }
     }
     if (!kisses.length) return;
     ctx.save();
@@ -495,12 +554,306 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       ctx.globalAlpha = Math.max(0, al) * 0.9;
       ctx.translate(kq.x, kq.y);
       ctx.rotate(kq.rot);
-      ctx.font = Math.round(kq.size * pop) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-      ctx.fillText('\uD83D\uDC8B', 0, 0);
+      ctx.font = Math.round(kq.size * pop) + 'px ' + EMOJI_FONT;
+      ctx.fillText(kq.g, 0, 0);
       ctx.restore();
     }
     ctx.restore();
   }
+
+  // ---- Effects: drawing ----
+  var STAG = [
+    [[-5,-0.6],[-4.2,-2],[-2,-2.6],[1,-2.5],[3.6,-1.8],[4.3,-0.4],[3.6,1.4],[1,2.1],[-2,2.1],[-4.4,1.4],[-5.2,0]],
+    [[4,-1.6],[5.6,-3.6],[7,-5.3]],
+    [[7,-5.3],[9.6,-4.4],[9.9,-3.7],[7.4,-3.3],[6.8,-3.6]],
+    [[7.2,-5.4],[6.6,-8.8],[5.2,-10.6]], [[6.6,-8.8],[8.2,-10.8]], [[6.9,-7],[5,-8.2]],
+    [[7.5,-5.4],[8.2,-8.2],[9.8,-9.4]], [[8.1,-7.6],[10.2,-7.4]],
+    [[-5.1,-1],[-6.4,-2]]
+  ];
+  function drawStag(now, dt) {
+    if (!stag) return;
+    var p = (now - stag.t0) / 4.5;
+    if (p >= 1) { stag = null; return; }
+    var sc = S * 1.6, dir = stag.dir;
+    var x = dir > 0 ? -14 * sc + p * (W + 28 * sc) : W + 14 * sc - p * (W + 28 * sc);
+    var y = cy + 2 * S - 5 * S * Math.sin(Math.PI * p) - 0.8 * S * Math.abs(Math.sin(now * 6));
+    var a = Math.min(1, p / 0.1, (1 - p) / 0.12);
+    var sw = 1.4 * Math.sin(now * 11);
+    var legs = [
+      [[3.8,1.8],[4.2 + sw,4.3],[4 + sw,6.2]], [[3,1.9],[2.2 - sw,4.5],[2 - sw,6.2]],
+      [[-3.8,1.8],[-4 + sw,4.3],[-4.5 + sw,6.2]], [[-3,1.9],[-2.2 - sw,4.5],[-2.5 - sw,6.2]]
+    ];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir * sc, sc);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 0.3;
+    ctx.strokeStyle = 'rgba(200,228,255,' + a + ')';
+    ctx.shadowColor = 'rgba(110,170,255,' + a + ')';
+    ctx.shadowBlur = 16 * dpr;
+    var all = STAG.concat(legs);
+    for (var li = 0; li < all.length; li++) {
+      var ln = all[li];
+      ctx.beginPath();
+      ctx.moveTo(ln[0][0], ln[0][1]);
+      for (var pi = 1; pi < ln.length; pi++) ctx.lineTo(ln[pi][0], ln[pi][1]);
+      ctx.stroke();
+    }
+    ctx.restore();
+    if (Math.random() < 0.9) {
+      for (var tr = 0; tr < 2; tr++) sparks.push({ x: x - dir * (4 + Math.random() * 5) * sc, y: y + (Math.random() * 8 - 3) * sc, vx: -dir * 10, vy: -8 - Math.random() * 18, life: 0, max: 0.7 + Math.random() * 0.8, r: 1 + Math.random() * 1.6, c: '170,214,255' });
+      if (sparks.length > 260) sparks.splice(0, sparks.length - 260);
+    }
+  }
+  function drawWarp(now) {
+    var p = (now - warpT0) / 1.8;
+    if (p < 0 || p > 1) return;
+    var bell = Math.sin(Math.PI * p), maxR = Math.hypot(W, H) * 0.6, ease = p * p;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (var i = 0; i < warpStars.length; i++) {
+      var st = warpStars[i];
+      var d2 = maxR * (st.r0 + ease * st.sp * 1.4), d1 = Math.max(0, d2 - d2 * 0.5 * bell);
+      var cs = Math.cos(st.a), sn = Math.sin(st.a);
+      ctx.strokeStyle = 'rgba(205,225,255,' + (bell * 0.9) + ')';
+      ctx.lineWidth = 0.8 + st.sp;
+      ctx.beginPath();
+      ctx.moveTo(cx + cs * d1, cy + sn * d1);
+      ctx.lineTo(cx + cs * d2, cy + sn * d2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  var PIX = ['0011100011100','0111110111110','1111111111111','1111111111111','1111111111111','0111111111110','0011111111100','0001111111000','0000111110000','0000011100000','0000001000000'];
+  function drawPixelHeart(now, k, beat) {
+    var c = 2.3, x0 = -6.5 * c, y0 = -5.5 * c - 1;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, pixelUntil - now, 1));
+    ctx.translate(cx, cy);
+    ctx.scale(S * k, S * k);
+    ctx.shadowColor = 'rgba(255,79,163,0.9)';
+    ctx.shadowBlur = (26 + 30 * beat) * dpr;
+    for (var r = 0; r < PIX.length; r++) {
+      for (var q = 0; q < 13; q++) {
+        if (PIX[r].charAt(q) !== '1') continue;
+        var edge = (PIX[r + 1] || '').charAt(q) !== '1' || PIX[r].charAt(q + 1) !== '1';
+        ctx.fillStyle = (r <= 2 && q <= 3) ? '#ff9fd0' : edge ? '#c2186e' : '#ff4fa3';
+        ctx.fillRect(x0 + q * c, y0 + r * c, c - 0.12, c - 0.12);
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x0 + 1 * c, y0 + 1 * c, c - 0.12, c - 0.12);
+    ctx.fillRect(x0 + 2 * c, y0 + 1 * c, c - 0.12, c - 0.12);
+    ctx.fillRect(x0 + 1 * c, y0 + 2 * c, c - 0.12, c - 0.12);
+    ctx.restore();
+  }
+  function drawBinary(now) {
+    var ba = Math.max(0, Math.min(1, binUntil - now, 1));
+    ctx.font = 'bold 2.3px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var fl = Math.floor(now * 5);
+    for (var bj = -6; bj <= 6; bj++) {
+      for (var bi = -7; bi <= 7; bi++) {
+        var h = ((bi * 73856093) ^ (bj * 19349663) ^ (fl * 83492791)) >>> 0;
+        ctx.fillStyle = 'rgba(255,238,248,' + ((0.35 + 0.55 * ((h >> 3) & 1)) * ba) + ')';
+        ctx.fillText((h & 1) ? '1' : '0', bi * 2.3, bj * 2.4);
+      }
+    }
+  }
+  function drawFinger(now) {
+    var p = (now - mT0) / 5;
+    if (p < 0 || p > 1) return;
+    var r = Math.min(1, p / 0.12, (1 - p) / 0.12);
+    r = r * r * (3 - 2 * r);
+    ctx.save();
+    ctx.font = Math.round(13 * S) + 'px ' + EMOJI_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🖕', cx, cy - 6 * S - r * 11 * S);
+    ctx.restore();
+  }
+
+  // ---- Effects: doing them ----
+  var RIZZ = [
+    "Are you Wi-Fi? Because I'm feeling a connection.",
+    "Is your name Google? You have everything I've been searching for.",
+    "Do you have a map? I keep getting lost in your eyes.",
+    "Are you a charger? Because I'd be dead without you.",
+    "Are you a keyboard? You're just my type.",
+    "Are you a time zone? I'd change mine for you.",
+    "Are you made of copper and tellurium? Because you're Cu-Te.",
+    "You're the missing semicolon in my code.",
+    "Do you believe in love at first swipe?",
+    "If you were a triangle, you'd be acute one."
+  ];
+  var FX_OK = { patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
+  function buzz(pat, remote) {
+    if (remote && nightNow.me) return;
+    try { if (navigator.vibrate) navigator.vibrate(pat); } catch (e) {}
+  }
+  function runFx(k, d, remote) {
+    var nowS = performance.now() / 1000;
+    if (k === 'kiss') kissBurst(d.u || 0, d.v || 0);
+    else if (k === 'patronus') { stag = { t0: nowS, dir: d.d === -1 ? -1 : 1 }; buzz([20, 40, 20, 40, 20], remote); }
+    else if (k === 'saber') {
+      ripples.push({ t0: nowS, c: '90,170,255' });
+      setTimeout(function () { ripples.push({ t0: performance.now() / 1000, c: '255,70,70' }); }, 220);
+      boost = 0.16;
+      buzz([30, 30, 120], remote);
+    }
+    else if (k === 'iluToo') { startLove(nowS, 'I love you too', { quiet: true }); buzz([60, 40, 120], remote); }
+    else if (k === 'pixel') { pixelUntil = nowS + 10; boost = 0.16; buzz([30, 30, 30, 30, 60], remote); }
+    else if (k === 'binary') binUntil = nowS + 10;
+    else if (k === 'warp') warpT0 = nowS;
+    else if (k === 'fh') {
+      var fx0 = cx + (d.u || 0) * S, fy0 = cy + (d.v || 0) * S;
+      for (var f = 0; f < 9; f++) addKiss(fx0 + (Math.random() - 0.5) * 24, fy0, false, '💗', false, 16 + Math.random() * 12);
+      buzz([25, 30, 25], remote);
+    }
+    else if (k === 'confetti') { confettiUntil = nowS + 3; buzz([40, 40, 40, 40, 40], remote); }
+    else if (k === 'rizz') showToast(RIZZ[(Math.abs(d.i | 0)) % RIZZ.length]);
+    else if (k === 'good') {
+      boost = 0.14;
+      if (remote) { startLove(nowS, 'Good girl', { quiet: true }); buzz([60, 80, 60, 80, 60], remote); }
+      else { ripples.push({ t0: nowS, c: MINE }); buzz([40, 60, 40], false); }
+    }
+  }
+  function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  function doFx(k, d) {
+    d = d || {};
+    runFx(k, d, false);
+    if (k === 'kiss') { send({ t: 'kiss', k: 'dbl', u: r2(d.u), v: r2(d.v) }); return; }
+    var o = { t: 'fx', k: k };
+    if (d.u != null) o.u = r2(d.u);
+    if (d.v != null) o.v = r2(d.v);
+    if (d.d != null) o.d = d.d;
+    if (d.i != null) o.i = d.i;
+    send(o);
+  }
+
+  // M mode: only on the phone that triggers it
+  var mTimer1 = 0, mTimer2 = 0;
+  var whiskyEl = document.getElementById('whisky');
+  function startM() {
+    var nowS = performance.now() / 1000;
+    mT0 = nowS;
+    cv.style.filter = 'grayscale(1) brightness(0.92)';
+    startLove(nowS, 'leave me alone', { quiet: true, grey: true });
+    whiskyEl.hidden = false;
+    clearTimeout(mTimer1); clearTimeout(mTimer2);
+    mTimer1 = setTimeout(function () { cv.style.filter = ''; }, 5000);
+    mTimer2 = setTimeout(function () { whiskyEl.hidden = true; }, 10000);
+    buzz([200, 80, 200], false);
+  }
+
+  // Anniversary
+  var goldEl = document.getElementById('gold');
+  function ord(n) { var sfx = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (sfx[(v - 20) % 10] || sfx[v] || sfx[0]); }
+  function updateAnniv() {
+    var d = lsGet(K('anniv')), on = annivForce, txt = 'Happy anniversary';
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      var t = new Date(), mm = ('0' + (t.getMonth() + 1)).slice(-2), dd = ('0' + t.getDate()).slice(-2);
+      if (d.slice(5) === mm + '-' + dd) {
+        on = true;
+        var yrs = t.getFullYear() - Number(d.slice(0, 4));
+        if (yrs > 0) txt = 'Happy ' + ord(yrs) + ' anniversary';
+      }
+    }
+    annivToday = on;
+    goldEl.textContent = on ? txt : '';
+    goldEl.classList.toggle('show', on);
+  }
+  var annivPanel = document.getElementById('annivPanel');
+  var annivInput = document.getElementById('annivInput');
+  document.getElementById('hotl').addEventListener('click', function () {
+    annivInput.value = lsGet(K('anniv')) || '';
+    annivPanel.hidden = !annivPanel.hidden;
+  });
+  document.getElementById('annivClose').addEventListener('click', function () { annivPanel.hidden = true; });
+  document.getElementById('annivSave').addEventListener('click', function () {
+    var v = annivInput.value;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      lsSet(K('anniv'), v);
+      send({ t: 'anniv', d: v });
+      updateAnniv();
+      annivPanel.hidden = true;
+      showToast('Anniversary saved');
+    }
+  });
+  document.getElementById('annivClear').addEventListener('click', function () {
+    lsSet(K('anniv'), '');
+    updateAnniv();
+    annivPanel.hidden = true;
+  });
+
+  // Streak: days you both touched the heart
+  function dayKey(ts) { var t = new Date(ts); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }
+  function loadDays(name) { var o = {}; (lsGet(K(name)) || '').split(',').forEach(function (x) { if (x) o[x] = 1; }); return o; }
+  var daysMe = loadDays('daysme'), daysThem = loadDays('daysthem');
+  function markDay(who, ts) {
+    var o = who === 'me' ? daysMe : daysThem, dk = dayKey(ts);
+    if (o[dk]) return;
+    o[dk] = 1;
+    lsSet(K(who === 'me' ? 'daysme' : 'daysthem'), Object.keys(o).sort().slice(-400).join(','));
+  }
+  function streakNow() {
+    var d = new Date(), n = 0;
+    while (n < 800 && daysMe[dayKey(d)] && daysThem[dayKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function checkStreak() {
+    var n = streakNow();
+    if ([7, 30, 100, 365].indexOf(n) >= 0 && !lsGet(K('flame' + n))) {
+      lsSet(K('flame' + n), 1);
+      showToast('🔥 ' + n + ' days in a row');
+    }
+  }
+
+  // Hidden notes
+  var noteQueue = [], noteShowing = false;
+  var noteBox = document.getElementById('notebox');
+  var composeEl = document.getElementById('compose');
+  var composeInput = document.getElementById('composeInput');
+  function noteSeenBefore(id) {
+    var l = (lsGet('hb-noteseen') || '').split(',');
+    if (l.indexOf(id) >= 0) return true;
+    l.push(id);
+    lsSet('hb-noteseen', l.slice(-40).join(','));
+    return false;
+  }
+  function showNextNote() {
+    if (noteShowing || !noteQueue.length) return;
+    noteShowing = true;
+    noteBox.textContent = '💌 ' + noteQueue.shift();
+    noteBox.hidden = false;
+    buzz([60, 60, 60], true);
+  }
+  noteBox.addEventListener('click', function () { noteBox.hidden = true; noteShowing = false; showNextNote(); });
+  function openCompose() { composeInput.value = ''; composeEl.hidden = false; try { composeInput.focus(); } catch (e) {} }
+  document.getElementById('composeCancel').addEventListener('click', function () { composeEl.hidden = true; });
+  document.getElementById('composeSend').addEventListener('click', function () {
+    var t = composeInput.value.trim().slice(0, 140);
+    if (t) { send({ t: 'note', n: t }); showToast('Note hidden for them 💌'); }
+    composeEl.hidden = true;
+  });
+
+  // Shake the phone three times for confetti
+  var shakes = [], lastShakeAt = -1e9;
+  window.addEventListener('devicemotion', function (e) {
+    var a = e.accelerationIncludingGravity;
+    if (!a) return;
+    var m = Math.sqrt((a.x || 0) * (a.x || 0) + (a.y || 0) * (a.y || 0) + (a.z || 0) * (a.z || 0));
+    var now = performance.now();
+    if (Math.abs(m - 9.8) < 13) return;
+    if (!shakes.length || now - shakes[shakes.length - 1] > 150) shakes.push(now);
+    shakes = shakes.filter(function (t) { return now - t < 1200; });
+    if (shakes.length >= 3 && now - lastShakeAt > 6000) { lastShakeAt = now; shakes = []; doFx('confetti', {}); }
+  });
 
   function addTouch(u, v, mine) {
     var now = performance.now() / 1000;
@@ -578,17 +931,24 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     return false;
   }
-  function startLove(nowS) {
+  function startLove(nowS, text, o) {
+    o = o || {};
     loveStart = nowS;
     loveNextRipple = nowS;
-    loveEl.textContent = 'I love you';
+    loveEl.textContent = text || 'I love you';
+    loveEl.classList.toggle('grey', !!o.grey);
     boost = 0.16;
-    if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
+    if (!o.quiet && !nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
   }
   function maybeLove() {
     var nowMs = performance.now();
     if (nowMs / 1000 - loveStart < LOVE_TOTAL + 1.5) return;
-    if (mineActive(nowMs) && remoteActive(nowMs)) startLove(nowMs / 1000);
+    if (mineActive(nowMs) && remoteActive(nowMs)) {
+      if (nightNow.me) {
+        startLove(nowMs / 1000, 'Good night my love', { quiet: true });
+        addKiss(cx, cy - 2 * S, true, KISS, false, Math.round(S * 9));
+      } else startLove(nowMs / 1000);
+    }
   }
   function loveAmount(nowS) {
     var t = nowS - loveStart;
@@ -635,6 +995,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       nightChecked = now;
       var sig = nightNow.me + ',' + nightNow.them;
       if (sig !== nightSig) { nightSig = sig; updateStatus(); }
+      updateAnniv();
     }
     var nightT = (nightNow.me || nightNow.them) ? 1 : 0;
     nightAmt += (nightT - nightAmt) * Math.min(1, dt * 0.8);
@@ -665,6 +1026,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
 
     drawGalaxy(now);
+    drawWarp(now);
 
     var auraF = (1 - 0.65 * dull) * (1 - 0.4 * nightAmt);
     var aura = ctx.createRadialGradient(cx, cy, S * 4, cx, cy, Math.max(W, H) * 0.75);
@@ -680,9 +1042,24 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       ctx.fillRect(0, 0, W, H);
     }
 
+    if (annivToday) {
+      var ga = ctx.createRadialGradient(cx, cy, S * 3, cx, cy, Math.max(W, H) * 0.7);
+      ga.addColorStop(0, 'rgba(255,196,80,' + (0.2 + 0.08 * beat) + ')');
+      ga.addColorStop(1, 'rgba(255,196,80,0)');
+      ctx.fillStyle = ga;
+      ctx.fillRect(0, 0, W, H);
+      if (glitter.length && Math.random() < 0.2) {
+        var gg0 = glitter[Math.floor(Math.random() * glitter.length)];
+        sparks.push({ x: cx + gg0.x * S * k, y: cy + gg0.y * S * k, vx: (Math.random() - 0.5) * 24, vy: -16 - Math.random() * 30, life: 0, max: 1 + Math.random(), r: 1 + Math.random() * 1.6, c: '255,210,110' });
+      }
+    }
     drawKisses(now, dt);
     drawRipples(now);
+    drawFinger(now);
 
+    var pixelOn = now < pixelUntil;
+    if (pixelOn) drawPixelHeart(now, 1 + Math.round((k - 1) * 40) / 40, beat);
+    else {
     var glowF = (1 - 0.7 * dull) * (1 - 0.3 * nightAmt);
     ctx.save();
     ctx.translate(cx, cy);
@@ -724,12 +1101,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       }
     }
     ctx.globalCompositeOperation = 'source-over';
+    if (now < binUntil) drawBinary(now);
     ctx.restore();
 
     ctx.lineWidth = 0.18;
     ctx.strokeStyle = 'rgba(255,214,236,' + (0.6 * (1 - 0.5 * dull)) + ')';
     ctx.stroke(hp);
     ctx.restore();
+    }
 
     ctx.globalCompositeOperation = 'lighter';
     for (var si = sparks.length - 1; si >= 0; si--) {
@@ -749,6 +1128,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     ctx.globalCompositeOperation = 'source-over';
 
+    drawStag(now, dt);
     if (love > 0) {
       loveText = true;
       loveEl.style.visibility = 'visible';
@@ -873,6 +1253,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var tms = d.time ? d.time * 1000 : Date.now();
     var mineDev = m.dv === did;
     if (!mineDev && !paired) { paired = true; lsSet(K('paired'), 1); }
+    if (m.t === 'touch' && m.d === 1) { markDay(mineDev ? 'me' : 'them', tms); if (live) checkStreak(); }
+    if (m.t === 'anniv' && typeof m.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.d)) { lsSet(K('anniv'), m.d); updateAnniv(); }
+    if (m.t === 'note' && !mineDev && typeof m.n === 'string' && m.n && !noteSeenBefore(d.id)) {
+      noteQueue.push(m.n.slice(0, 140));
+      if (live) showNextNote();
+    }
     if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
     if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
       if (tms > lastTouchAt) { lastTouchAt = tms; lsSet(K('lasttouch'), lastTouchAt); }
@@ -894,6 +1280,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
       maybeLove();
+    } else if (m.t === 'fx' && FX_OK[m.k] === 1) {
+      runFx(m.k, { u: clampUnit(m.u), v: clampUnit(m.v), d: m.d === -1 ? -1 : 1, i: Number(m.i) || 0 }, true);
     } else if (m.t === 'kiss') {
       if (m.k === 'bg') startKissRain(tn / 1000);
       else kissBurst(clampUnit(m.u), clampUnit(m.v));
@@ -912,6 +1300,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (finished) return;
       finished = true;
       savePending();
+      checkStreak();
+      showNextNote();
       lastSeenAt = Date.now();
       saveSeen();
       done(maxT);
@@ -998,6 +1388,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var v = (e.clientY - cy) / S;
     lastTouchAt = Math.max(lastTouchAt, Date.now());
     lsSet(K('lasttouch'), lastTouchAt);
+    if (isDown) { markDay('me', Date.now()); checkStreak(); }
     if (pending > 0) { showAway(pending); pending = 0; savePending(); }
     addTouch(u, v, true);
     send({ t: 'touch', d: isDown ? 1 : 0, u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
@@ -1021,24 +1412,40 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   });
   window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); });
 
-  // Double tap = a few kisses. Bottom tip, then the left and right top bulges (any order) within a few seconds = kiss rain.
-  var lastTapAt = 0, lastTapU = 0, lastTapV = 0;
+  // ---- Gestures ----
+  var ptrs = {};
+  var taps = [];
+  var konami = [];
+  var KONAMI = ['top', 'top', 'bottom', 'bottom', 'left', 'right', 'left', 'right'];
   var seq = { tip: 0, left: 0, right: 0 };
+  var lastPetAt = -1e9;
+
+  function inHeart(u, v) {
+    var c = false;
+    for (var i = 0, j = hpts.length - 1; i < hpts.length; j = i++) {
+      var xi = hpts[i][0], yi = hpts[i][1], xj = hpts[j][0], yj = hpts[j][1];
+      if (((yi > v) !== (yj > v)) && (u < (xj - xi) * (v - yi) / (yj - yi) + xi)) c = !c;
+    }
+    return c;
+  }
+  function isDip(u, v) { return Math.abs(u) < 3.2 && v > -11 && v < -4.5; }
   function zoneOf(u, v) {
     if (v > 6.5 && Math.abs(u) < 8) return 'tip';
     if (v < 1 && u < -2) return 'left';
     if (v < 1 && u > 2) return 'right';
     return '';
   }
-  function detectKisses(u, v) {
-    var now = performance.now();
-    if (now - lastTapAt < 350 && Math.abs(u - lastTapU) < 9 && Math.abs(v - lastTapV) < 9) {
-      lastTapAt = 0;
-      kissBurst(u, v);
-      send({ t: 'kiss', k: 'dbl', u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
-    } else {
-      lastTapAt = now; lastTapU = u; lastTapV = v;
-    }
+  function outsideZone(u, v) {
+    if (v < -16) return 'top';
+    if (v > 17) return 'bottom';
+    if (u < -17) return 'left';
+    if (u > 17) return 'right';
+    return '';
+  }
+  function near(a, b) { return Math.abs(a.u - b.u) < 9 && Math.abs(a.v - b.v) < 9; }
+
+  // Bottom tip, then the left and right top bulges (any order) within a few seconds = kiss rain.
+  function kissSequence(u, v, now) {
     var z = zoneOf(u, v);
     if (!z) return;
     seq[z] = now;
@@ -1051,26 +1458,106 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  function gestureDown(p, u, v, now) {
+    // two fingers together: opposite sides = lightsabers, close together = finger heart
+    for (var id in ptrs) {
+      var o = ptrs[id];
+      if (o !== p && !o.pair && now - o.t0 < 400) {
+        o.pair = p.pair = true;
+        if (Math.abs(u - o.u0) >= 14) doFx('saber', {});
+        else doFx('fh', { u: (u + o.u0) / 2, v: (v + o.v0) / 2 });
+        return;
+      }
+    }
+    // long presses: bottom tip = hide a note, centre = binary heart
+    if (v > 9 && Math.abs(u) < 5) {
+      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; openCompose(); } }, 1000));
+    } else if (Math.abs(u) < 6 && Math.abs(v) < 6) {
+      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; doFx('binary', {}); } }, 1800));
+    }
+    var inside = inHeart(u, v), dip = isDip(u, v);
+    taps.push({ t: now, u: u, v: v, inside: inside, dip: dip });
+    while (taps.length > 6) taps.shift();
+    var n = taps.length, t1 = taps[n - 1], t2 = taps[n - 2], t3 = taps[n - 3];
+    if (dip && t3 && t3.dip && t2.dip && now - t3.t < 900) {
+      taps.length = 0;
+      startM();
+    } else if (!inside && t3 && !t3.inside && !t2.inside && near(t1, t2) && near(t2, t3) && now - t3.t < 900) {
+      taps.length = 0;
+      doFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) });
+    } else if (inside && !dip && t2 && t2.inside && !t2.dip && near(t1, t2) && now - t2.t < 350) {
+      taps.length = 0;
+      if (loveAmount(now / 1000) > 0.15) doFx('iluToo', {});
+      else doFx('kiss', { u: u, v: v });
+    }
+    var z = outsideZone(u, v);
+    if (z && !inside) {
+      konami.push({ t: now, z: z });
+      if (konami.length > 8) konami.shift();
+      var ok = konami.length === 8;
+      for (var i = 0; ok && i < 8; i++) {
+        if (konami[i].z !== KONAMI[i]) ok = false;
+        else if (i && konami[i].t - konami[i - 1].t > 1600) ok = false;
+      }
+      if (ok) { konami.length = 0; doFx('pixel', {}); }
+    }
+    kissSequence(u, v, now);
+  }
+
   cv.addEventListener('pointerdown', function (e) {
+    var now = performance.now();
+    var u = (e.clientX - cx) / S, v = (e.clientY - cy) / S;
+    var id = e.pointerId == null ? 0 : e.pointerId;
+    ptrs[id] = { id: id, t0: now, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, u0: u, v0: v, len: 0, mv: 0, done: false, pair: false, timers: [] };
     pressed = true;
     mineDown = true;
-    lastSend = performance.now();
+    lastSend = now;
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     wake();
     touch(e, true);
     maybeLove();
-    detectKisses((e.clientX - cx) / S, (e.clientY - cy) / S);
     clearTimeout(holdTimer);
     holdTimer = setTimeout(sendHold, 400);
+    gestureDown(ptrs[id], u, v, now);
   });
   cv.addEventListener('pointermove', function (e) {
+    var now = performance.now();
+    var p = ptrs[e.pointerId == null ? 0 : e.pointerId];
+    if (p) {
+      var dx = e.clientX - p.x, dy = e.clientY - p.y;
+      p.len += Math.sqrt(dx * dx + dy * dy);
+      p.x = e.clientX; p.y = e.clientY;
+      p.mv = Math.max(p.mv, Math.sqrt(Math.pow(e.clientX - p.x0, 2) + Math.pow(e.clientY - p.y0, 2)) / S);
+      // slow petting stroke on the heart
+      var dur = now - p.t0;
+      if (!p.done && !p.pair && dur > 1100 && p.len > 5 * S && p.len / (dur / 1000) < 170 && now - lastPetAt > 6000 &&
+          inHeart((e.clientX - cx) / S, (e.clientY - cy) / S)) {
+        p.done = true;
+        lastPetAt = now;
+        doFx('good', {});
+      }
+    }
     if (!pressed) return;
-    var n = performance.now();
-    if (n - lastSend < 450) return;
-    lastSend = n;
+    if (now - lastSend < 450) return;
+    lastSend = now;
     touch(e, false);
   });
-  function release() {
+  function strokeEnd(p, now) {
+    var dur = now - p.t0;
+    if (p.done || p.pair || dur > 450 || p.len < Math.min(W, H) * 0.32) return;
+    var dx = p.x - p.x0, dy = p.y - p.y0;
+    if (Math.abs(dx) > Math.abs(dy) * 1.2) doFx('patronus', { d: dx > 0 ? 1 : -1 });
+    else if (dy < 0 && Math.abs(dy) > Math.abs(dx) * 1.2 && nightAmt > 0.3) doFx('warp', {});
+  }
+  function release(e) {
+    var id = e && e.pointerId != null ? e.pointerId : 0;
+    var p = ptrs[id];
+    if (p) {
+      p.timers.forEach(clearTimeout);
+      delete ptrs[id];
+      strokeEnd(p, performance.now());
+    }
+    for (var k2 in ptrs) return;   // another finger is still down
     if (!pressed) return;
     pressed = false;
     mineDown = false;
@@ -1134,7 +1621,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1153,12 +1640,27 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'away9') showAway(9);
     else if (a === 'ripple') addTouch(0, 0, true);
     else if (a === 'kiss') startKissRain(performance.now() / 1000);
+    else if (a === 'kissdbl') kissBurst(0, 0);
+    else if (a === 'patronus') runFx('patronus', { d: 1 }, false);
+    else if (a === 'saber') runFx('saber', {}, false);
+    else if (a === 'ilutoo') runFx('iluToo', {}, false);
+    else if (a === 'pixel') runFx('pixel', {}, false);
+    else if (a === 'binary') runFx('binary', {}, false);
+    else if (a === 'warp') runFx('warp', {}, false);
+    else if (a === 'fh') runFx('fh', { u: 0, v: 0 }, false);
+    else if (a === 'confetti') runFx('confetti', {}, false);
+    else if (a === 'rizz') runFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) }, false);
+    else if (a === 'good') runFx('good', {}, true);
+    else if (a === 'mmode') startM();
+    else if (a === 'note') openCompose();
+    else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
       else showToast(navigator.vibrate(250) ? 'Buzz sent' : 'Buzz blocked: tap the page first');
     }
     else if (a === 'reset') {
       ovr = { heart: 'auto', time: 'auto', partner: 'auto', zone: 'auto', tickled: 'auto' };
+      annivForce = false; updateAnniv();
       afterOvr();
     }
   }
