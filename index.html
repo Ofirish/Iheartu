@@ -980,20 +980,40 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     lsSet('hb-noteseen', l.slice(-40).join(','));
     return false;
   }
+  function loadOut() { try { return JSON.parse(lsGet(K('notesout')) || '{}') || {}; } catch (e) { return {}; } }
+  function saveOut(o) {
+    var ks = Object.keys(o);
+    if (ks.length > 40) ks.slice(0, ks.length - 40).forEach(function (k) { delete o[k]; });
+    lsSet(K('notesout'), JSON.stringify(o));
+  }
   function showNextNote() {
     if (noteShowing || !noteQueue.length) return;
     noteShowing = true;
-    noteBox.textContent = '💌 ' + noteQueue.shift();
+    var item = noteQueue.shift();
+    noteBox.textContent = '💌 ' + item.n;
     noteBox.hidden = false;
     buzz([60, 60, 60], true);
+    if (item.nid) sendReliable({ t: 'noteread', nid: item.nid });
   }
   noteBox.addEventListener('click', function () { noteBox.hidden = true; noteShowing = false; showNextNote(); });
   function openCompose() { composeInput.value = ''; composeEl.hidden = false; try { composeInput.focus(); } catch (e) {} }
   document.getElementById('composeCancel').addEventListener('click', function () { composeEl.hidden = true; });
   document.getElementById('composeSend').addEventListener('click', function () {
     var t = composeInput.value.trim().slice(0, 140);
-    if (t) { send({ t: 'note', n: t }); showToast('Note hidden for them 💌'); }
     composeEl.hidden = true;
+    if (!t) return;
+    var nid = Math.random().toString(36).slice(2, 10);
+    showToast('Sending note…');
+    sendReliable({ t: 'note', n: t, nid: nid }, function (okSent) {
+      if (okSent) {
+        var out = loadOut(); out[nid] = 0; saveOut(out);
+        showToast('Note sent 💌 Hidden until they open the heart', 6000);
+      } else {
+        showToast("Couldn't send the note. Check your connection and try again.", 7000);
+        composeInput.value = t;
+        composeEl.hidden = false;
+      }
+    });
   });
 
   // Shake the phone three times for confetti
@@ -1406,12 +1426,37 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     return splitCh;
   }
-  function send(obj) {
-    if (splitOpen) return;
+  function stamp(obj) {
     obj.id = me;
     obj.dv = did;
     if (myZone) obj.z = myZone;
     if (obj.t === 'hi' && annivAt() > 0) { obj.an = lsGet(K('anniv')) || ''; obj.at = annivAt(); }
+    return obj;
+  }
+  // For messages that must arrive (notes, read receipts): checks the relay's answer and retries.
+  var RETRY_MS = [0, 1500, 4000];
+  function sendReliable(obj, onDone) {
+    if (splitOpen) { if (onDone) onDone(false); return; }
+    if (NS) { send(obj); if (onDone) onDone(true); return; }
+    stamp(obj);
+    var i = 0;
+    function attempt() {
+      var failed = function () {
+        i++;
+        if (i < RETRY_MS.length) setTimeout(attempt, RETRY_MS[i]);
+        else if (onDone) onDone(false);
+      };
+      try {
+        fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(obj) }).then(function (r) {
+          if (r && r.ok === false) failed(); else if (onDone) onDone(true);
+        }, failed);
+      } catch (e) { failed(); }
+    }
+    attempt();
+  }
+  function send(obj) {
+    if (splitOpen) return;
+    stamp(obj);
     if (NS) {   // split-screen test pane: talk to the other pane directly, never through the relay
       var sc = splitChannel();
       if (sc) { try { sc.postMessage(JSON.stringify(obj)); } catch (e) {} }
@@ -1440,8 +1485,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (m.t === 'anniv') adoptAnniv(m.d, m.at);
     else if (m.t === 'hi' && typeof m.an === 'string') adoptAnniv(m.an, m.at);
     if (m.t === 'note' && !mineDev && typeof m.n === 'string' && m.n && !noteSeenBefore(d.id)) {
-      noteQueue.push(m.n.slice(0, 140));
+      noteQueue.push({ n: m.n.slice(0, 140), nid: typeof m.nid === 'string' ? m.nid.slice(0, 16) : '' });
       if (live) showNextNote();
+    }
+    if (m.t === 'noteread' && !mineDev && typeof m.nid === 'string') {
+      var outN = loadOut();
+      if (outN[m.nid] === 0) { outN[m.nid] = 1; saveOut(outN); showToast('💌 Your note was read', 6000); }
     }
     if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
     if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
