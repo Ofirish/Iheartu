@@ -13,8 +13,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&display=swap">
 <style>
-/* Layout: one full-bleed canvas, a glittering heart centred just above middle, a caption and invite button at the bottom.
-   Single dark look: the glow needs a night ground. */
+/* Layout: one full-bleed canvas (heart, galaxy, ripples), a "last tickled" line at the top, a caption and invite
+   button at the bottom. Single dark look on purpose: the glow needs a night ground. */
 :root {
   color-scheme: dark;
   --bg: #13030e;
@@ -23,6 +23,7 @@
   --deep: #7a1d4d;
   --ink: #ffe3f1;
   --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
@@ -36,6 +37,48 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 #heart { position: fixed; inset: 0; display: block; touch-action: none; cursor: pointer; }
+
+.tickled {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: 0;
+  right: 0;
+  padding-inline: 60px;
+  text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--blush);
+  opacity: 0.8;
+  text-shadow: 0 0 14px rgba(255, 79, 163, 0.55);
+}
+.tickled:empty { display: none; }
+
+.toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 96px);
+  left: 0;
+  right: 0;
+  padding-inline: 24px;
+  text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  color: #ffe9f7;
+  text-shadow: 0 0 12px rgba(255, 79, 163, 0.95), 0 0 28px rgba(160, 90, 255, 0.8);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.toast.show { opacity: 1; }
+
 .caption {
   position: fixed;
   left: 0;
@@ -54,6 +97,8 @@ body {
 .status:empty { visibility: hidden; }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--deep); flex: none; }
 .status.together::before { background: var(--rose); box-shadow: 0 0 10px 2px var(--rose); }
+.note { margin-top: 2px; font-size: 0.95rem; color: var(--blush); opacity: 0.6; }
+.note:empty { display: none; }
 .invite {
   pointer-events: auto;
   margin-top: 14px;
@@ -71,6 +116,7 @@ body {
 .invite:hover { border-color: var(--rose); }
 .invite:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
 .invite[hidden] { display: none; }
+
 .love {
   position: fixed;
   left: 50%;
@@ -98,31 +144,145 @@ body {
 }
 @keyframes loveShimmer { from { background-position: 0% 0; } to { background-position: 200% 0; } }
 @media (prefers-reduced-motion: reduce) { .love { animation: none; } }
+
+/* Secret admin: hot corner, passphrase box, panel */
+.hot { position: fixed; top: 0; left: 0; width: 64px; height: calc(64px + env(safe-area-inset-top, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
+.gate { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; z-index: 31; }
+.gate[hidden] { display: none; }
+.gate input {
+  width: 132px;
+  padding: 8px 10px;
+  font: 16px var(--font-ui);
+  color: var(--ink);
+  background: rgba(19, 3, 14, 0.88);
+  border: 1px solid rgba(255, 208, 234, 0.3);
+  border-radius: 8px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.gate input:focus-visible { outline: 2px solid var(--rose); }
+.admin {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: rgba(12, 3, 16, 0.94);
+  border-top: 1px solid rgba(255, 208, 234, 0.25);
+  color: var(--ink);
+  font: 13px/1.4 var(--font-ui);
+  z-index: 40;
+  touch-action: pan-y;
+}
+.admin[hidden] { display: none; }
+body.admin-open .caption { bottom: calc(38vh + 12px); }
+.ad-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.ad-head strong { font-weight: 600; letter-spacing: 0.02em; }
+.ad-row { display: grid; gap: 4px; margin-bottom: 8px; }
+.ad-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.65; }
+.ad-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin button {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 208, 234, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.admin button.on { background: rgba(255, 79, 163, 0.28); border-color: var(--rose); }
+.admin button:focus-visible { outline: 2px solid var(--rose); outline-offset: 2px; }
 </style>
 </head>
 <body>
 
 <canvas id="heart" role="img" aria-label="A glittering pink heart that pulses. Touch it to send glowing ripples to the person you shared the link with."></canvas>
+<div class="tickled" id="tickled"></div>
+<div class="toast" id="toast" role="status"></div>
 <div class="love" id="love" role="status"></div>
 <div class="caption" aria-live="polite">
   <p class="hint">Touch the heart</p>
   <p class="status" id="status"></p>
+  <p class="note" id="note"></p>
   <button class="invite" id="invite" type="button">Invite someone</button>
 </div>
+<div class="hot" id="hot"></div>
+<div class="gate" id="gate" hidden><input id="gateInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Passphrase"></div>
+<div class="admin" id="admin" hidden></div>
 
 <script>
 (function () {
   var cv = document.getElementById('heart');
   var ctx = cv.getContext('2d');
   var statusEl = document.getElementById('status');
+  var noteEl = document.getElementById('note');
+  var tickledEl = document.getElementById('tickled');
+  var toastEl = document.getElementById('toast');
   var inviteBtn = document.getElementById('invite');
+  var loveEl = document.getElementById('love');
+  var hotEl = document.getElementById('hot');
+  var gateEl = document.getElementById('gate');
+  var gateInput = document.getElementById('gateInput');
+  var adminEl = document.getElementById('admin');
+
   var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var AMP = reduce ? 0.03 : 0.065;
   var DUR = reduce ? 1.6 : 2.4;
   var MINE = '255,79,163';
   var THEIRS = '255,208,234';
+  var PURPLE = '178,110,255';
+  var IDLE_MS = 60000;      // untouched this long: the heart rests
+  var NIGHT_START = 22;     // night hours, in each person's own local time: 22:00 to 07:00
+  var NIGHT_END = 7;
 
   var W = 0, H = 0, dpr = 1, cx = 0, cy = 0, S = 1;
+  var adminOpen = false;
+
+  // <helpers> pure functions, also exercised by a test outside the page
+  function okZone(z) {
+    if (typeof z !== 'string' || !z || z.length > 64) return false;
+    try { new Intl.DateTimeFormat('en-US', { timeZone: z }); return true; } catch (e) { return false; }
+  }
+  function hourIn(zone, d) {
+    if (!zone) return d.getHours();
+    return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', hourCycle: 'h23' }).format(d), 10) % 24;
+  }
+  function nightFor(zone, d) {
+    var h = hourIn(zone, d);
+    return h >= NIGHT_START || h < NIGHT_END;
+  }
+  function offsetMin(zone, d) {
+    var f = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    var p = {};
+    f.formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+    var asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+    return Math.round((asUtc - (d.getTime() - d.getMilliseconds())) / 60000);
+  }
+  function fmtAt(ms, zone) {
+    var d = new Date(ms);
+    var opts = zone ? { timeZone: zone } : {};
+    var time = d.toLocaleTimeString([], Object.assign({ hour: 'numeric', minute: '2-digit' }, opts));
+    var today = new Date().toLocaleDateString('en-CA', opts);
+    var that = d.toLocaleDateString('en-CA', opts);
+    var prefix = '';
+    if (that !== today) {
+      var diff = Math.round((Date.parse(today) - Date.parse(that)) / 86400000);
+      if (diff === 1) prefix = 'yesterday ';
+      else if (diff > 1 && diff < 7) prefix = d.toLocaleDateString([], Object.assign({ weekday: 'short' }, opts)) + ' ';
+      else prefix = d.toLocaleDateString([], Object.assign({ day: 'numeric', month: 'short' }, opts)) + ' ';
+    }
+    return prefix + time;
+  }
+  // </helpers>
+
+  var myZone = '';
+  try { myZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  if (!okZone(myZone)) myZone = '';
 
   // Heart outline in its own units: x -16..16, y -14.5..14.5, y pointing down, centred on 0,0.
   var hp = new Path2D();
@@ -165,18 +325,133 @@ body {
   var sparks = [];
   var boost = 0;
   var last = 0;
+  var phase = 0;
+  var dull = 0;          // 0 = lively, 1 = resting
+  var nightAmt = 0;      // 0 = day, 1 = night
+  var nightNow = { me: false, them: false };
+  var nightChecked = -99;
+  var nightSig = '';
+
+  // shared state
+  var lastTouchAt = 0;   // ms, last time either of you touched the heart
+  var pending = 0;       // touches from the other person while you were away
+  var lastSeenAt = 0;
+  var partnerZone = '';
+  var settled = false;
+  var connected = false;
+  var peers = {};
+  var PEER_TTL = 50000;
 
   // "I love you" state
-  var loveEl = document.getElementById('love');
-  var LOVE_TOTAL = 5.6;   // seconds on screen
-  var GRACE = 1500;       // ms: two touches this close count as "at the same time"
-  var PURPLE = '178,110,255';
+  var LOVE_TOTAL = 5.6;
+  var GRACE = 1500;
   var loveStart = -100;
   var loveNextRipple = 0;
   var loveText = false;
   var mineDown = false;
   var mineUpAt = 0;
   var remote = {};
+
+  // admin overrides, local to this phone
+  var ovr = { heart: 'auto', time: 'auto', partner: 'auto', zone: 'auto', tickled: 'auto' };
+
+  // ---- Galaxy (night) ----
+  var galaxy = null, galaxyW = 0, galaxyH = 0, twinkles = [];
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t2 = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t2 = t2 + Math.imul(t2 ^ t2 >>> 7, 61 | t2) ^ t2;
+      return ((t2 ^ t2 >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function buildGalaxy() {
+    if (galaxy && galaxyW === W && galaxyH === H) return;
+    galaxyW = W; galaxyH = H;
+    var r = rng(20261012);
+    function gauss() { return r() + r() + r() + r() - 2; }
+    var gc = document.createElement('canvas');
+    gc.width = Math.round(W * dpr);
+    gc.height = Math.round(H * dpr);
+    var g = gc.getContext('2d');
+    g.scale(dpr, dpr);
+    var bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#04020d');
+    bg.addColorStop(0.5, '#0a0420');
+    bg.addColorStop(1, '#14041c');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+
+    // Milky Way band running from lower left to upper right
+    var ang = -0.55, ca = Math.cos(ang), sa = Math.sin(ang);
+    var L = Math.hypot(W, H), m = Math.min(W, H), bw = m * 0.42;
+    var bx = W / 2, by = H * 0.5;
+    function bandPt(spread) {
+      var u = (r() - 0.5) * L * 1.1, v = gauss() * spread;
+      return [bx + u * ca - v * sa, by + u * sa + v * ca];
+    }
+    var cols = ['107,47,168', '194,65,142', '42,111,176', '88,60,190'];
+    g.globalCompositeOperation = 'lighter';
+    var n, p, rad, col, gr, size, a;
+    for (n = 0; n < 18; n++) {
+      p = bandPt(bw * 0.5);
+      rad = (0.18 + r() * 0.3) * m * 1.2;
+      col = cols[Math.floor(r() * cols.length)];
+      gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], rad);
+      gr.addColorStop(0, 'rgba(' + col + ',0.20)');
+      gr.addColorStop(1, 'rgba(' + col + ',0)');
+      g.fillStyle = gr;
+      g.fillRect(p[0] - rad, p[1] - rad, rad * 2, rad * 2);
+    }
+    for (n = 0; n < 2600; n++) {
+      p = bandPt(bw * 0.55);
+      a = 0.05 + r() * 0.25;
+      size = 0.4 + r() * 0.9;
+      g.fillStyle = 'rgba(215,200,255,' + a + ')';
+      g.fillRect(p[0], p[1], size, size);
+    }
+    g.globalCompositeOperation = 'source-over';
+    for (n = 0; n < 7; n++) {
+      p = bandPt(bw * 0.35);
+      rad = (0.06 + r() * 0.12) * m;
+      gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], rad);
+      gr.addColorStop(0, 'rgba(4,2,12,0.35)');
+      gr.addColorStop(1, 'rgba(4,2,12,0)');
+      g.fillStyle = gr;
+      g.fillRect(p[0] - rad, p[1] - rad, rad * 2, rad * 2);
+    }
+    var count = Math.round(W * H / 2500);
+    for (n = 0; n < count; n++) {
+      a = 0.2 + r() * 0.6;
+      size = r() < 0.08 ? 1.6 : 0.9;
+      g.fillStyle = 'rgba(255,255,255,' + a + ')';
+      g.fillRect(r() * W, r() * H, size, size);
+    }
+    galaxy = gc;
+
+    twinkles = [];
+    for (n = 0; n < 70; n++) {
+      var q = r();
+      twinkles.push({ x: r() * W, y: r() * H, r: 0.8 + r() * 1.4, ph: r() * 6.283, sp: 0.6 + r() * 1.8, c: q < 0.3 ? '255,200,230' : (q < 0.6 ? '200,215,255' : '255,255,255') });
+    }
+  }
+  function drawGalaxy(now) {
+    if (nightAmt < 0.01 || !galaxy) return;
+    ctx.save();
+    ctx.globalAlpha = nightAmt;
+    ctx.drawImage(galaxy, 0, 0, W, H);
+    for (var i = 0; i < twinkles.length; i++) {
+      var s = twinkles[i];
+      var tw = 0.5 + 0.5 * Math.sin(now * s.sp + s.ph);
+      ctx.fillStyle = 'rgba(' + s.c + ',' + (0.25 + 0.75 * tw) + ')';
+      ctx.fillRect(s.x - s.r / 2, s.y - s.r / 2, s.r, s.r);
+      if (s.r > 1.7 && tw > 0.7) {
+        ctx.fillRect(s.x - s.r * 2.2, s.y - 0.3, s.r * 4.4, 0.6);
+        ctx.fillRect(s.x - 0.3, s.y - s.r * 2.2, 0.6, s.r * 4.4);
+      }
+    }
+    ctx.restore();
+  }
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -186,17 +461,18 @@ body {
     cv.height = Math.round(H * dpr);
     cv.style.width = W + 'px';
     cv.style.height = H + 'px';
-    S = Math.min(W * 0.64 / 32, H * 0.40 / 29);
+    var vh = adminOpen ? H * 0.62 : H;
+    S = Math.min(W * 0.64 / 32, vh * 0.40 / 29);
     cx = W / 2;
-    cy = H * 0.42;
+    cy = vh * 0.42;
     loveEl.style.top = cy + 'px';
     loveEl.style.fontSize = Math.max(28, S * 5.2) + 'px';
+    buildGalaxy();
   }
   window.addEventListener('resize', resize);
   resize();
 
-  function beatAt(time) {
-    var p = (time % 1.15) / 1.15;
+  function beatAt(p) {
     function g(c, w) { return Math.exp(-Math.pow((p - c) / w, 2)); }
     return Math.min(1, g(0.08, 0.06) + 0.65 * g(0.30, 0.07));
   }
@@ -216,10 +492,66 @@ body {
     if (ripples.length > 12) ripples.shift();
     boost = Math.min(boost + 0.09, 0.16);
     burst(cx + u * S, cy + v * S, mine ? MINE : THEIRS);
-    try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {}
+    // no buzzing a sleeping phone
+    if (mine || !nightNow.me) {
+      try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {}
+    }
   }
 
-  // Each phone works this out on its own from the touches it sees, so both light up together.
+  // ---- effective states (real, unless the admin panel overrides them) ----
+  function remoteHeld(nowMs) {
+    for (var id in remote) {
+      var p = remote[id];
+      if (p.holdAt && nowMs - p.holdAt < 10000) return true;
+    }
+    return false;
+  }
+  function effPartnerZone() {
+    if (ovr.zone === 'same') return myZone;
+    if (ovr.zone !== 'auto') return ovr.zone;
+    return partnerZone;
+  }
+  function effLastTouch() {
+    var t = ovr.tickled;
+    if (t === 'none') return 0;
+    if (t === '2m') return Date.now() - 120000;
+    if (t === 'yday') return Date.now() - 26 * 3600000;
+    if (t === '3d') return Date.now() - 72 * 3600000;
+    return lastTouchAt;
+  }
+  function effIdle() {
+    if (ovr.heart === 'active') return false;
+    if (ovr.heart === 'dull') return true;
+    var lt = effLastTouch();
+    if (!lt) return false;   // nobody has touched it yet: a brand new heart stays lively
+    if (mineDown || remoteHeld(performance.now())) return false;
+    return Date.now() - lt > IDLE_MS;
+  }
+  function nightInfo() {
+    var d = new Date(), me = false, them = false;
+    if (ovr.time === 'auto') {
+      try { me = nightFor(myZone, d); } catch (e) {}
+      var pz = effPartnerZone();
+      if (pz) { try { them = nightFor(pz, d); } catch (e) {} }
+    } else {
+      me = ovr.time === 'night-me' || ovr.time === 'night-both';
+      them = ovr.time === 'night-them' || ovr.time === 'night-both';
+    }
+    return { me: me, them: them };
+  }
+  function livePeers() {
+    var now = Date.now(), n = 0;
+    for (var id in peers) if (now - peers[id] < PEER_TTL) n++;
+    return n;
+  }
+  function effPeer() {
+    if (ovr.partner !== 'auto') return ovr.partner;
+    if (!settled) return 'none';
+    if (!connected) return 'reconnecting';
+    return livePeers() >= 1 ? 'here' : 'waiting';
+  }
+
+  // ---- "I love you" ----
   function mineActive(nowMs) { return mineDown || nowMs - mineUpAt < GRACE; }
   function remoteActive(nowMs) {
     for (var id in remote) {
@@ -235,7 +567,7 @@ body {
     loveNextRipple = nowS;
     loveEl.textContent = 'I love you';
     boost = 0.16;
-    try { if (navigator.vibrate) navigator.vibrate([30, 60, 30, 60, 80]); } catch (e) {}
+    if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([30, 60, 30, 60, 80]); } catch (e) {} }
   }
   function maybeLove() {
     var nowMs = performance.now();
@@ -282,12 +614,26 @@ body {
     var dt = Math.min(0.05, now - last);
     last = now;
 
+    if (now - nightChecked > 1) {
+      nightNow = nightInfo();
+      nightChecked = now;
+      var sig = nightNow.me + ',' + nightNow.them;
+      if (sig !== nightSig) { nightSig = sig; updateStatus(); }
+    }
+    var nightT = (nightNow.me || nightNow.them) ? 1 : 0;
+    nightAmt += (nightT - nightAmt) * Math.min(1, dt * 0.8);
+    var idleT = effIdle() ? 1 : 0;
+    dull += (idleT - dull) * Math.min(1, dt * 1.6);
+
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    var beat = beatAt(now);
+    var period = 1.15 + 2.65 * nightAmt;      // about 3.8 s per beat at night
+    phase = (phase + dt / period) % 1;
+    var beat = beatAt(phase) * (1 - dull);
     boost -= boost * Math.min(1, dt * 5);
-    var k = 1 + AMP * beat + boost;
+    var amp = AMP * (1 - 0.45 * nightAmt);
+    var k = 1 + amp * beat + boost;
 
     var love = loveAmount(now);
     if (love > 0) {
@@ -302,8 +648,11 @@ body {
       }
     }
 
+    drawGalaxy(now);
+
+    var auraF = (1 - 0.65 * dull) * (1 - 0.4 * nightAmt);
     var aura = ctx.createRadialGradient(cx, cy, S * 4, cx, cy, Math.max(W, H) * 0.75);
-    aura.addColorStop(0, 'rgba(255,79,163,' + (0.2 + 0.12 * beat + boost) + ')');
+    aura.addColorStop(0, 'rgba(255,79,163,' + ((0.2 + 0.12 * beat + boost) * auraF) + ')');
     aura.addColorStop(1, 'rgba(255,79,163,0)');
     ctx.fillStyle = aura;
     ctx.fillRect(0, 0, W, H);
@@ -317,12 +666,13 @@ body {
 
     drawRipples(now);
 
+    var glowF = (1 - 0.7 * dull) * (1 - 0.3 * nightAmt);
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(S * k, S * k);
     var gr = Math.round(255 - 85 * love), gg = Math.round(79 + 31 * love), gb = Math.round(163 + 92 * love);
-    ctx.shadowColor = 'rgba(' + gr + ',' + gg + ',' + gb + ',0.95)';
-    ctx.shadowBlur = (28 + 36 * beat + boost * 220 + love * 30) * dpr;
+    ctx.shadowColor = 'rgba(' + gr + ',' + gg + ',' + gb + ',' + (0.95 * (1 - 0.5 * dull)) + ')';
+    ctx.shadowBlur = (28 + 36 * beat + boost * 220 + love * 30) * glowF * dpr;
     ctx.fillStyle = bodyGrad;
     ctx.fill(hp);
     ctx.shadowBlur = 0;
@@ -332,20 +682,25 @@ body {
     ctx.clip(hp);
     ctx.fillStyle = glossGrad;
     ctx.fillRect(-16, -16, 32, 32);
+    if (dull > 0.01) {
+      ctx.fillStyle = 'rgba(112,88,104,' + (0.62 * dull) + ')';
+      ctx.fillRect(-16, -16, 32, 32);
+    }
     if (love > 0) {
       ctx.fillStyle = 'rgba(48,10,84,' + (0.4 * love) + ')';
       ctx.fillRect(-16, -16, 32, 32);
     }
+    var gf = 1 - 0.75 * dull;
     ctx.globalCompositeOperation = 'lighter';
     for (var gi = 0; gi < glitter.length; gi++) {
       var q = glitter[gi];
       var s = Math.sin(now * q.sp + q.ph);
       var tw = s > 0 ? Math.pow(s, 6) : 0;
-      var a = 0.1 + 0.9 * tw;
+      var a = (0.1 + 0.9 * tw) * gf;
       ctx.fillStyle = q.w ? 'rgba(255,245,252,' + a + ')' : 'rgba(255,170,215,' + a + ')';
       var rr = q.r * (0.7 + 0.5 * tw);
       ctx.fillRect(q.x - rr, q.y - rr, rr * 2, rr * 2);
-      if (tw > 0.55 && q.r > 0.3) {
+      if (tw > 0.55 && q.r > 0.3 && gf > 0.5) {
         var L = q.r * 5 * tw;
         ctx.fillRect(q.x - L, q.y - 0.04, L * 2, 0.08);
         ctx.fillRect(q.x - 0.04, q.y - L, 0.08, L * 2);
@@ -355,7 +710,7 @@ body {
     ctx.restore();
 
     ctx.lineWidth = 0.18;
-    ctx.strokeStyle = 'rgba(255,214,236,0.6)';
+    ctx.strokeStyle = 'rgba(255,214,236,' + (0.6 * (1 - 0.5 * dull)) + ')';
     ctx.stroke(hp);
     ctx.restore();
 
@@ -393,22 +748,21 @@ body {
   }
   requestAnimationFrame(function (ts) { last = ts / 1000; frame(ts); });
 
-  // ---- Sync through a free public relay (ntfy.sh). No account, nothing to host. ----
-  // To use your own relay later, change RELAY to your own ntfy server address.
-  var RELAY = 'https://ntfy.sh';
-  var PEER_TTL = 50000;
+  // ---- Storage ----
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
 
+  // ---- Room ----
   // The room code lives in the link after the #. Each phone also remembers it, so the home-screen app
   // reopens the same room every time, with no expiry.
+  var RELAY = 'https://ntfy.sh';
   var ROOM_KEY = 'heartbeat-room';
-  function saveRoom(code) { try { localStorage.setItem(ROOM_KEY, code); } catch (e) {} }
   function setHash(code) { try { history.replaceState(null, '', '#' + code); } catch (e) { location.hash = code; } }
   function getRoom() {
     var ok = /^[a-z0-9]{6,32}$/;
     var h = (location.hash || '').replace(/^#/, '');
-    if (ok.test(h)) { saveRoom(h); return h; }
-    var saved = '';
-    try { saved = localStorage.getItem(ROOM_KEY) || ''; } catch (e) {}
+    if (ok.test(h)) { lsSet(ROOM_KEY, h); return h; }
+    var saved = lsGet(ROOM_KEY) || '';
     if (ok.test(saved)) { setHash(saved); return saved; }
     // New room: 16 random characters from a 31-letter alphabet (about 79 bits), no modulo bias.
     var alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -420,78 +774,173 @@ body {
         if (bytes[i] < 248) code += alphabet.charAt(bytes[i] % 31);
       }
     }
-    saveRoom(code);
+    lsSet(ROOM_KEY, code);
     setHash(code);
     return code;
   }
   var room = getRoom();
   var topic = 'heartbeat-' + room;
-  var me = Math.random().toString(36).slice(2, 10);
-  var peers = {};
-  var connected = false;
-  var settled = false;
+  function K(n) { return 'hb-' + room + '-' + n; }
 
-  function send(obj) {
-    obj.id = me;
+  var me = Math.random().toString(36).slice(2, 10);      // this open page, to ignore our own echo
+  var did = lsGet('hb-did');                              // this phone, to tell your touches from theirs in history
+  if (!did) { did = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); lsSet('hb-did', did); }
+
+  lastTouchAt = Number(lsGet(K('lasttouch'))) || 0;
+  pending = parseInt(lsGet(K('pending')), 10) || 0;
+  lastSeenAt = Number(lsGet(K('seen'))) || 0;
+  partnerZone = lsGet(K('pzone')) || '';
+  if (!okZone(partnerZone)) partnerZone = '';
+  function savePending() { lsSet(K('pending'), pending); }
+  function saveSeen() { lsSet(K('seen'), lastSeenAt); }
+
+  // ---- Messages: tickled line, toast, status ----
+  function updateTickled() {
+    var lt = effLastTouch();
+    if (!lt) { tickledEl.textContent = ''; return; }
+    var txt = 'Heart last tickled at ' + fmtAt(lt, myZone);
+    var pz = effPartnerZone();
     try {
-      fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(obj) }).catch(function () {});
+      if (pz && myZone && pz !== myZone && offsetMin(pz, new Date(lt)) !== offsetMin(myZone, new Date(lt))) {
+        txt += ' (yours) · ' + fmtAt(lt, pz) + ' (theirs)';
+      }
     } catch (e) {}
+    tickledEl.textContent = txt;
   }
 
-  function livePeers() {
-    var now = Date.now(), n = 0;
-    for (var id in peers) if (now - peers[id] < PEER_TTL) n++;
-    return n;
+  var toastTimer = 0;
+  function showToast(txt) {
+    toastEl.textContent = txt;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 5200);
+  }
+  function showAway(n) {
+    if (!(n >= 1)) return;   // never say "0 times"
+    showToast("You've been loved " + n + (n === 1 ? ' time' : ' times') + ' while away');
   }
 
   function updateStatus() {
-    var txt = '', together = false;
-    if (settled) {
-      if (!connected) txt = 'Reconnecting…';
-      else if (livePeers() >= 1) { txt = 'Both of you are here'; together = true; }
-      else txt = 'Waiting for the other heart';
-    }
+    var st = effPeer(), txt = '', together = false;
+    if (st === 'reconnecting') txt = 'Reconnecting…';
+    else if (st === 'here') { txt = 'Both of you are here'; together = true; }
+    else if (st === 'waiting') txt = 'Waiting for the other heart';
     statusEl.textContent = txt;
     statusEl.classList.toggle('together', together);
-    inviteBtn.hidden = together; // no need to invite once you are both here
+    inviteBtn.hidden = together;   // no need to invite once you are both here
+    var n = nightNow;
+    noteEl.textContent = n.me && n.them ? "Night mode · it's night for you both" : n.me ? "Night mode · it's night for you" : n.them ? "Night mode · it's night for them" : '';
+    updateTickled();
   }
   setTimeout(function () { settled = true; updateStatus(); }, 2500);
-  setInterval(updateStatus, 5000);
+  setInterval(function () {
+    if (document.visibilityState === 'visible') { lastSeenAt = Date.now(); saveSeen(); }
+    updateStatus();
+  }, 5000);
+
+  // ---- Sync through a free public relay (ntfy.sh). No account, nothing to host. ----
+  // To use your own relay later, change RELAY to your own ntfy server address.
+  var seen = {};
+  var es = null;
+
+  function send(obj) {
+    obj.id = me;
+    obj.dv = did;
+    if (myZone) obj.z = myZone;
+    try {
+      fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: JSON.stringify(obj) }).catch(function () {});
+    } catch (e) {}
+  }
 
   function clampUnit(n) { n = Number(n); if (!isFinite(n)) return 0; return Math.max(-3, Math.min(3, n)); }
 
-  function connect() {
+  // One relay message. live=false for the saved history that is read when the page opens.
+  function ingest(d, live) {
+    if (!d || d.event !== 'message' || typeof d.id !== 'string') return;
+    if (seen[d.id]) return;
+    seen[d.id] = 1;
+    var m;
+    try { m = JSON.parse(d.message); } catch (e) { return; }
+    if (!m || typeof m.id !== 'string' || typeof m.t !== 'string') return;
+    var tms = d.time ? d.time * 1000 : Date.now();
+    var mineDev = m.dv === did;
+    if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
+    if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
+      if (tms > lastTouchAt) { lastTouchAt = tms; lsSet(K('lasttouch'), lastTouchAt); }
+    }
+    if (!live) {
+      // history: count their presses made while you were away
+      if (m.t === 'touch' && m.d === 1 && !mineDev && lastSeenAt > 0 && tms >= lastSeenAt) pending++;
+      return;
+    }
+    if (m.id === me) return;
+    var now = Date.now();
+    var isNew = !peers[m.id] || now - peers[m.id] > PEER_TTL;
+    peers[m.id] = now;
+    var rp = remote[m.id] || (remote[m.id] = { downAt: 0, holdAt: 0, upAt: 0 });
+    var tn = performance.now();
+    if (m.t === 'hi') {
+      if (isNew) send({ t: 'hi' });
+    } else if (m.t === 'touch') {
+      rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
+      addTouch(clampUnit(m.u), clampUnit(m.v), false);
+      maybeLove();
+    } else if (m.t === 'hold') {
+      rp.holdAt = tn;
+      maybeLove();
+    } else if (m.t === 'up') {
+      rp.upAt = tn; rp.holdAt = 0;
+    }
+  }
+
+  function loadHistory(done) {
+    var maxT = 0, finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      savePending();
+      lastSeenAt = Date.now();
+      saveSeen();
+      done(maxT);
+    }
+    if (!window.fetch) { finish(); return; }
+    var timer = setTimeout(finish, 6000);
+    fetch(RELAY + '/' + topic + '/json?poll=1&since=all').then(function (r) { return r.text(); }).then(function (txt) {
+      if (finished) return;
+      var lines = txt.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        if (!lines[i]) continue;
+        var d;
+        try { d = JSON.parse(lines[i]); } catch (e) { continue; }
+        if (d.event === 'message' && d.time && d.time > maxT) maxT = d.time;
+        ingest(d, false);
+      }
+      clearTimeout(timer);
+      finish();
+    }).catch(function () { clearTimeout(timer); finish(); });
+  }
+
+  function openStream(since) {
+    if (es) { try { es.close(); } catch (e) {} es = null; }
     if (!window.EventSource) return;
-    var es = new EventSource(RELAY + '/' + topic + '/sse');
+    es = new EventSource(RELAY + '/' + topic + '/sse?since=' + since);
     es.onopen = function () { connected = true; send({ t: 'hi' }); updateStatus(); };
     es.onerror = function () { connected = false; updateStatus(); };
     es.onmessage = function (ev) {
-      var d, m;
+      var d;
       try { d = JSON.parse(ev.data); } catch (e) { return; }
-      if (!d || d.event !== 'message') return;
-      try { m = JSON.parse(d.message); } catch (e) { return; }
-      if (!m || typeof m.id !== 'string' || m.id === me) return;
-      var now = Date.now();
-      var isNew = !peers[m.id] || now - peers[m.id] > PEER_TTL;
-      peers[m.id] = now;
-      var rp = remote[m.id] || (remote[m.id] = { downAt: 0, holdAt: 0, upAt: 0 });
-      var tn = performance.now();
-      if (m.t === 'hi') {
-        if (isNew) send({ t: 'hi' });
-      } else if (m.t === 'touch') {
-        rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
-        addTouch(clampUnit(m.u), clampUnit(m.v), false);
-        maybeLove();
-      } else if (m.t === 'hold') {
-        rp.holdAt = tn;
-        maybeLove();
-      } else if (m.t === 'up') {
-        rp.upAt = tn; rp.holdAt = 0;
-      }
+      ingest(d, true);
       updateStatus();
     };
   }
-  connect();
+
+  function startSession() {
+    loadHistory(function (maxT) {
+      openStream(maxT ? String(maxT) : '5s');
+      updateStatus();
+    });
+  }
+  startSession();
   setInterval(function () { if (connected && document.visibilityState === 'visible') send({ t: 'hi' }); }, 20000);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -531,11 +980,15 @@ body {
     holdTimer = setTimeout(sendHold, 4000);
   }
 
-  function touch(e) {
+  function touch(e, isDown) {
     var u = (e.clientX - cx) / S;
     var v = (e.clientY - cy) / S;
+    lastTouchAt = Math.max(lastTouchAt, Date.now());
+    lsSet(K('lasttouch'), lastTouchAt);
+    if (pending > 0) { showAway(pending); pending = 0; savePending(); }
     addTouch(u, v, true);
-    send({ t: 'touch', u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
+    send({ t: 'touch', d: isDown ? 1 : 0, u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
+    updateTickled();
   }
 
   function wake() {
@@ -544,9 +997,17 @@ body {
     } catch (e) {}
   }
   document.addEventListener('visibilitychange', function () {
-    wake();
-    if (document.visibilityState === 'visible' && connected) send({ t: 'hi' });
+    if (document.visibilityState === 'hidden') {
+      lastSeenAt = Date.now();
+      saveSeen();
+    } else {
+      wake();
+      // back after a while: catch up on what you missed
+      if (Date.now() - lastSeenAt > 20000) startSession();
+      else if (connected) send({ t: 'hi' });
+    }
   });
+  window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); });
 
   cv.addEventListener('pointerdown', function (e) {
     pressed = true;
@@ -554,7 +1015,7 @@ body {
     lastSend = performance.now();
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     wake();
-    touch(e);
+    touch(e, true);
     maybeLove();
     clearTimeout(holdTimer);
     holdTimer = setTimeout(sendHold, 400);
@@ -564,19 +1025,126 @@ body {
     var n = performance.now();
     if (n - lastSend < 450) return;
     lastSend = n;
-    touch(e);
+    touch(e, false);
   });
   function release() {
     if (!pressed) return;
     pressed = false;
     mineDown = false;
     mineUpAt = performance.now();
+    lastTouchAt = Math.max(lastTouchAt, Date.now());
+    lsSet(K('lasttouch'), lastTouchAt);
     clearTimeout(holdTimer);
     if (holdSent) { holdSent = false; send({ t: 'up' }); }
   }
   cv.addEventListener('pointerup', release);
   cv.addEventListener('pointercancel', release);
   cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ---- Secret admin: tap the top-left corner, type Ofir, and the panel opens ----
+  // This only changes what this phone shows. It is not real security; anyone reading the page source can find it.
+  var gateTimer = 0;
+  function closeGate() { gateEl.hidden = true; gateInput.value = ''; clearTimeout(gateTimer); }
+  hotEl.addEventListener('click', function () {
+    if (!gateEl.hidden) { closeGate(); return; }
+    gateEl.hidden = false;
+    gateInput.value = '';
+    try { gateInput.focus(); } catch (e) {}
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(closeGate, 12000);
+  });
+  gateInput.addEventListener('input', function () {
+    if (gateInput.value === 'Ofir') { closeGate(); openAdmin(); }
+  });
+  gateInput.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeGate(); });
+
+  var GROUPS = [
+    { key: 'heart', label: 'Heart', opts: [['auto', 'Auto'], ['active', 'Lively'], ['dull', 'Resting (dull)']] },
+    { key: 'time', label: 'Time of day', opts: [['auto', 'Auto'], ['day', 'Day'], ['night-me', 'Night: you'], ['night-them', 'Night: them'], ['night-both', 'Night: both']] },
+    { key: 'partner', label: 'Other person', opts: [['auto', 'Auto'], ['waiting', 'Waiting'], ['here', 'Here'], ['reconnecting', 'Reconnecting']] },
+    { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
+    { key: 'tickled', label: 'Last tickled', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
+  ];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['reset', 'Reset all']];
+
+  function refreshAdmin() {
+    var bs = adminEl.querySelectorAll('button[data-group]');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', ovr[bs[i].dataset.group] === bs[i].dataset.val);
+  }
+  function afterOvr() {
+    nightNow = nightInfo();
+    nightChecked = performance.now() / 1000;
+    nightSig = nightNow.me + ',' + nightNow.them;
+    refreshAdmin();
+    updateStatus();
+  }
+  function runAction(a) {
+    if (a === 'love') startLove(performance.now() / 1000);
+    else if (a === 'away1') showAway(1);
+    else if (a === 'away9') showAway(9);
+    else if (a === 'ripple') addTouch(0, 0, true);
+    else if (a === 'reset') {
+      ovr = { heart: 'auto', time: 'auto', partner: 'auto', zone: 'auto', tickled: 'auto' };
+      afterOvr();
+    }
+  }
+  function mk(tag, cls, txt) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (txt) el.textContent = txt;
+    return el;
+  }
+  function buildAdmin() {
+    adminEl.textContent = '';
+    var head = mk('div', 'ad-head');
+    head.appendChild(mk('strong', '', 'Admin · emulate states'));
+    var close = mk('button', '', 'Close');
+    close.type = 'button';
+    close.addEventListener('click', closeAdmin);
+    head.appendChild(close);
+    adminEl.appendChild(head);
+    GROUPS.forEach(function (g) {
+      var row = mk('div', 'ad-row');
+      row.appendChild(mk('span', 'ad-label', g.label));
+      var box = mk('div', 'ad-opts');
+      g.opts.forEach(function (o) {
+        var b = mk('button', '', o[1]);
+        b.type = 'button';
+        b.dataset.group = g.key;
+        b.dataset.val = o[0];
+        b.addEventListener('click', function () { ovr[g.key] = o[0]; afterOvr(); });
+        box.appendChild(b);
+      });
+      row.appendChild(box);
+      adminEl.appendChild(row);
+    });
+    var arow = mk('div', 'ad-row');
+    arow.appendChild(mk('span', 'ad-label', 'Actions'));
+    var abox = mk('div', 'ad-opts');
+    ACTIONS.forEach(function (a) {
+      var b = mk('button', '', a[1]);
+      b.type = 'button';
+      b.addEventListener('click', function () { runAction(a[0]); });
+      abox.appendChild(b);
+    });
+    arow.appendChild(abox);
+    adminEl.appendChild(arow);
+    refreshAdmin();
+  }
+  function openAdmin() {
+    buildAdmin();
+    adminOpen = true;
+    adminEl.hidden = false;
+    document.body.classList.add('admin-open');
+    resize();
+  }
+  function closeAdmin() {
+    adminOpen = false;
+    adminEl.hidden = true;
+    document.body.classList.remove('admin-open');
+    resize();
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && adminOpen) closeAdmin(); });
 })();
 </script>
 </body>
