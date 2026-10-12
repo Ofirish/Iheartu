@@ -345,6 +345,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var stag = null;            // {t0, dir}
   var mT0 = -99;              // M mode (this phone only)
   var annivForce = false, annivToday = false;
+  var luvUntil = 0, luvMode = 'luv', luvAcc = 0;   // background rain of I love yous
   var warpStars = [];
   for (var ws0 = 0; ws0 < 120; ws0++) warpStars.push({ a: Math.random() * 6.283, r0: Math.random() * 0.06, sp: 0.5 + Math.random() * 0.9 });
   var boost = 0;
@@ -547,6 +548,23 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var CG = ['\uD83D\uDC96', '\uD83D\uDC97', '\uD83D\uDC95', '\uD83D\uDC98', '\uD83D\uDC9D', '\u2728'];
       while (confettiAcc >= 1) { confettiAcc -= 1; addKiss(Math.random() * W, -30, false, CG[Math.floor(Math.random() * CG.length)], true, 20 + Math.random() * 22); }
     }
+    if (now < luvUntil) {
+      luvAcc += dt * 9;
+      var LE = ['\uD83E\uDD17', '\u2764\uFE0F', '\uD83D\uDC8B', '\uD83D\uDC95', '\uD83D\uDE18', '\uD83D\uDC97', '\uD83E\uDD70'];
+      while (luvAcc >= 1) {
+        luvAcc -= 1;
+        var lx = 50 + Math.random() * Math.max(10, W - 100), ly = Math.random() * H;
+        if (Math.random() < 0.55) {
+          addKiss(lx, ly, true, luvMode === 'too' ? 'I love you too' : 'I love you', false, 22 + Math.random() * 24);
+          var lk = kisses[kisses.length - 1];
+          lk.txt = true; lk.vy = -(10 + Math.random() * 10); lk.vx = 0; lk.vr = 0; lk.rot = (Math.random() - 0.5) * 0.35;
+          lk.max = 4 + Math.random() * 1.5;
+          lk.col = Math.random() < 0.5 ? '#ffc2ec' : '#d6b8ff';
+        } else {
+          addKiss(lx, ly, true, LE[Math.floor(Math.random() * LE.length)], false, 24 + Math.random() * 30);
+        }
+      }
+    }
     if (!kisses.length) return;
     ctx.save();
     ctx.textAlign = 'center';
@@ -564,7 +582,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       ctx.globalAlpha = Math.max(0, al) * 0.9;
       ctx.translate(kq.x, kq.y);
       ctx.rotate(kq.rot);
-      ctx.font = Math.round(kq.size * pop) + 'px ' + EMOJI_FONT;
+      if (kq.txt) {
+        ctx.font = 'italic 600 ' + Math.round(kq.size * pop) + 'px "Cormorant Garamond", Georgia, serif';
+        ctx.fillStyle = kq.col;
+        ctx.shadowColor = 'rgba(255,79,163,0.95)';
+        ctx.shadowBlur = 12 * dpr;
+      } else {
+        ctx.font = Math.round(kq.size * pop) + 'px ' + EMOJI_FONT;
+      }
       ctx.fillText(kq.g, 0, 0);
       ctx.restore();
     }
@@ -701,7 +726,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     "Do you believe in love at first swipe?",
     "If you were a triangle, you'd be acute one."
   ];
-  var FX_OK = { patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
+  var FX_OK = { luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
   function buzz(pat, remote) {
     if (remote && nightNow.me) return;
     try { if (navigator.vibrate) navigator.vibrate(pat); } catch (e) {}
@@ -709,6 +734,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function runFx(k, d, remote) {
     var nowS = performance.now() / 1000;
     if (k === 'kiss') kissBurst(d.u || 0, d.v || 0);
+    else if (k === 'luvrain') { luvMode = 'luv'; luvUntil = nowS + 10; luvAcc = 1; boost = 0.16; buzz([40, 40, 40, 40, 80], remote); }
+    else if (k === 'luvtoo') { luvMode = 'too'; luvUntil = nowS + 10; luvAcc = 1; boost = 0.16; kisses = kisses.filter(function (q) { return !q.txt; }); buzz([60, 40, 120], remote); }
     else if (k === 'patronus') { stag = { t0: nowS, dir: d.d === -1 ? -1 : 1 }; buzz([20, 40, 20, 40, 20], remote); }
     else if (k === 'saber') {
       ripples.push({ t0: nowS, c: '90,170,255' });
@@ -1528,13 +1555,29 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  // Touching one of the floating "I love you"s turns the background into "I love you too"
+  function hitLove(x, y) {
+    for (var i = kisses.length - 1; i >= 0; i--) {
+      var q = kisses[i];
+      if (!q.txt || q.g !== 'I love you') continue;
+      var hw = q.size * 0.26 * q.g.length + 18, hh = q.size * 0.7 + 14;
+      if (Math.abs(x - q.x) < hw && Math.abs(y - q.y) < hh) return true;
+    }
+    return false;
+  }
   function gestureDown(p, u, v, now) {
+    if (now / 1000 < luvUntil && luvMode === 'luv' && hitLove(p.x0, p.y0)) {
+      p.done = true;
+      doFx('luvtoo', {});
+      return;
+    }
     // two fingers together: opposite sides = lightsabers, close together = finger heart
     for (var id in ptrs) {
       var o = ptrs[id];
       if (o !== p && !o.pair && now - o.t0 < 400) {
         o.pair = p.pair = true;
-        if (Math.abs(u - o.u0) >= 14) doFx('saber', {});
+        if (!inHeart(u, v) && !inHeart(o.u0, o.v0) && Math.min(u, o.u0) < -17 && Math.max(u, o.u0) > 17) doFx('luvrain', {});
+        else if (Math.abs(u - o.u0) >= 14) doFx('saber', {});
         else doFx('fh', { u: (u + o.u0) / 2, v: (v + o.v0) / 2 });
         return;
       }
@@ -1691,7 +1734,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['ach', 'Achievements'], ['luv', 'I love you rain'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1724,6 +1767,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'mmode') startM();
     else if (a === 'note') openCompose();
     else if (a === 'ach') openAch();
+    else if (a === 'luv') runFx('luvrain', {}, false);
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
