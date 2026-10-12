@@ -70,6 +70,7 @@ body {
 }
 .invite:hover { border-color: var(--rose); }
 .invite:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+.invite[hidden] { display: none; }
 .love {
   position: fixed;
   left: 50%;
@@ -452,6 +453,7 @@ body {
     }
     statusEl.textContent = txt;
     statusEl.classList.toggle('together', together);
+    inviteBtn.hidden = together; // no need to invite once you are both here
   }
   setTimeout(function () { settled = true; updateStatus(); }, 2500);
   setInterval(updateStatus, 5000);
