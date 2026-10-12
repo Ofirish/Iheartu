@@ -1630,6 +1630,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var o = ptrs[id];
       if (o !== p && !o.pair && now - o.t0 < 400) {
         o.pair = p.pair = true;
+        // right after touching the tip, two fingers landing together on both bulges finish the kiss sequence
+        var zA = zoneOf(o.u0, o.v0), zB = zoneOf(u, v);
+        if (seq.tip && now - seq.tip < 4000 && ((zA === 'left' && zB === 'right') || (zA === 'right' && zB === 'left'))) {
+          kissSequence(o.u0, o.v0, now);
+          kissSequence(u, v, now);
+          return;
+        }
         if (!inHeart(u, v) && !inHeart(o.u0, o.v0) && Math.min(u, o.u0) < -17 && Math.max(u, o.u0) > 17) doFx('luvrain', {});
         else if (Math.abs(u - o.u0) >= 14) doFx('saber', {});
         else doFx('fh', { u: (u + o.u0) / 2, v: (v + o.v0) / 2 });
