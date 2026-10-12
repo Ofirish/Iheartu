@@ -249,7 +249,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <div class="row"><button type="button" id="achClose">Close</button></div>
 </div>
 <div class="panel" id="annivPanel" hidden>
-  <p>Your anniversary</p>
+  <p>Our anniversary. It's saved for this room, so you both see it.</p>
   <input id="annivInput" type="date" aria-label="Anniversary date">
   <div class="row"><button type="button" id="annivSave">Save</button><button type="button" id="annivClear">Clear</button><button type="button" id="annivClose">Close</button></div>
 </div>
@@ -822,6 +822,23 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     goldEl.textContent = on ? txt : '';
     goldEl.classList.toggle('show', on);
   }
+  // The anniversary belongs to the room, not to a phone: it carries a timestamp, travels with every hello between the
+  // two phones, and the newest value (including "cleared") wins on both.
+  function annivAt() { return Number(lsGet(K('annivat'))) || 0; }
+  function adoptAnniv(d, at) {
+    if (typeof at !== 'number' || !(at > annivAt())) return;
+    if (d !== '' && !(typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))) return;
+    lsSet(K('anniv'), d);
+    lsSet(K('annivat'), at);
+    updateAnniv();
+  }
+  function setAnniv(d) {
+    var at = Date.now();
+    lsSet(K('anniv'), d);
+    lsSet(K('annivat'), at);
+    send({ t: 'anniv', d: d, at: at });
+    updateAnniv();
+  }
   var annivPanel = document.getElementById('annivPanel');
   var annivInput = document.getElementById('annivInput');
   document.getElementById('hotl').addEventListener('click', function () {
@@ -832,16 +849,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   document.getElementById('annivSave').addEventListener('click', function () {
     var v = annivInput.value;
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-      lsSet(K('anniv'), v);
-      send({ t: 'anniv', d: v });
-      updateAnniv();
+      setAnniv(v);
       annivPanel.hidden = true;
       showToast('Anniversary saved');
     }
   });
   document.getElementById('annivClear').addEventListener('click', function () {
-    lsSet(K('anniv'), '');
-    updateAnniv();
+    setAnniv('');
     annivPanel.hidden = true;
   });
 
@@ -1325,6 +1339,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function initPersisted() {
     daysMe = loadDays('daysme');
     daysThem = loadDays('daysthem');
+    if (lsGet(K('anniv')) && !lsGet(K('annivat'))) lsSet(K('annivat'), 1);   // saved before dates were shared
     sentCount = parseInt(lsGet(K('sent')), 10) || 0;
     try { ach = JSON.parse(lsGet(K('ach')) || '{}') || {}; } catch (e) { ach = {}; }
   }
@@ -1396,6 +1411,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     obj.id = me;
     obj.dv = did;
     if (myZone) obj.z = myZone;
+    if (obj.t === 'hi' && annivAt() > 0) { obj.an = lsGet(K('anniv')) || ''; obj.at = annivAt(); }
     if (NS) {   // split-screen test pane: talk to the other pane directly, never through the relay
       var sc = splitChannel();
       if (sc) { try { sc.postMessage(JSON.stringify(obj)); } catch (e) {} }
@@ -1421,7 +1437,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var mineDev = m.dv === did;
     if (!mineDev && !paired) { paired = true; lsSet(K('paired'), 1); }
     if (m.t === 'touch' && m.d === 1) { markDay(mineDev ? 'me' : 'them', tms); if (live) checkStreak(); }
-    if (m.t === 'anniv' && typeof m.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.d)) { lsSet(K('anniv'), m.d); updateAnniv(); }
+    if (m.t === 'anniv') adoptAnniv(m.d, m.at);
+    else if (m.t === 'hi' && typeof m.an === 'string') adoptAnniv(m.an, m.at);
     if (m.t === 'note' && !mineDev && typeof m.n === 'string' && m.n && !noteSeenBefore(d.id)) {
       noteQueue.push(m.n.slice(0, 140));
       if (live) showNextNote();
@@ -1444,6 +1461,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (m.t === 'hi') {
       if (isNew) send({ t: 'hi' });
     } else if (m.t === 'touch') {
+      // a press that arrives while this page is hidden still counts as "loved while away" (the history replay later skips it as already seen)
+      if (m.d === 1 && document.visibilityState === 'hidden') { pending++; savePending(); }
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
       maybeLove();
@@ -1666,11 +1685,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
         return;
       }
     }
-    // long presses: bottom tip = hide a note, centre = binary heart
+    // long presses: bottom tip = hide a note, the dip at the top = binary heart (the middle is left free for holding hands)
     if (v > 9 && Math.abs(u) < 5) {
-      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; openCompose(); } }, 1000));
-    } else if (Math.abs(u) < 6 && Math.abs(v) < 6) {
-      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; doFx('binary', {}); } }, 1800));
+      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; openCompose(); } }, 1500));
+    } else if (isDip(u, v)) {
+      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; doFx('binary', {}); } }, 1500));
     }
     var inside = inHeart(u, v), dip = isDip(u, v);
     taps.push({ t: now, u: u, v: v, inside: inside, dip: dip });
