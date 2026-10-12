@@ -1338,7 +1338,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var RELAY = 'https://ntfy.sh';
   // Main relay: a Firebase Realtime Database (free plan). Empty = use ntfy.sh only.
   // ntfy.sh stays as the automatic fallback when Firebase can't be reached.
-  var FB_URL = '';
+  var FB_URL = 'https://iheartu-3f444-default-rtdb.europe-west1.firebasedatabase.app';
   if (typeof window.HB_FB === 'string') FB_URL = window.HB_FB;
   if (/[?&]relay=ntfy/.test(location.search)) FB_URL = '';
   var useFb = !!FB_URL;
