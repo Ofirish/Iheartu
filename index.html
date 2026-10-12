@@ -127,6 +127,7 @@ body {
 
 /* Secret admin: hot corner, passphrase box, panel */
 .hot { position: fixed; top: 0; left: 0; width: 64px; height: calc(64px + env(safe-area-inset-top, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
+.refresh { position: fixed; right: 0; bottom: 0; width: 64px; height: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
 .gate { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; z-index: 31; }
 .gate[hidden] { display: none; }
 .gate input {
@@ -191,6 +192,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <button class="invite" id="invite" type="button">Invite someone</button>
 </div>
 <div class="hot" id="hot"></div>
+<div class="refresh" id="refresh"></div>
 <div class="gate" id="gate" hidden><input id="gateInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Passphrase"></div>
 <div class="admin" id="admin" hidden></div>
 
@@ -204,6 +206,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var inviteBtn = document.getElementById('invite');
   var loveEl = document.getElementById('love');
   var hotEl = document.getElementById('hot');
+  var refreshEl = document.getElementById('refresh');
   var gateEl = document.getElementById('gate');
   var gateInput = document.getElementById('gateInput');
   var adminEl = document.getElementById('admin');
@@ -735,6 +738,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     return code;
   }
   var room = getRoom();
+  // a hard refresh adds ?r=... to bypass cached copies; keep the address clean afterwards
+  if (/[?&]r=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {} }
   var topic = 'heartbeat-' + room;
   function K(n) { return 'hb-' + room + '-' + n; }
 
@@ -981,6 +986,32 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   cv.addEventListener('pointerup', release);
   cv.addEventListener('pointercancel', release);
   cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ---- Hard refresh: tap the lower right corner. Clears the saved copy of the app and loads the newest version. ----
+  var refreshing = false;
+  function hardRefresh() {
+    if (refreshing) return;
+    refreshing = true;
+    var go = function () { location.replace(location.pathname + '?r=' + Date.now() + location.hash); };
+    var tasks = [];
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+          return Promise.all(rs.map(function (r) { return r.unregister(); }));
+        }));
+      }
+    } catch (e) {}
+    try {
+      if (window.caches && caches.keys) {
+        tasks.push(caches.keys().then(function (ks) {
+          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }));
+      }
+    } catch (e) {}
+    Promise.all(tasks).then(go, go);
+    setTimeout(go, 2500);   // never get stuck
+  }
+  refreshEl.addEventListener('click', hardRefresh);
 
   // ---- Secret admin: tap the top-left corner, type Ofir, and the panel opens ----
   // This only changes what this phone shows. It is not real security; anyone reading the page source can find it.
