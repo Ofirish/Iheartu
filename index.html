@@ -382,7 +382,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var settled = false;
   var connected = false;
   var peers = {};
-  var PEER_TTL = 50000;
+  var PEER_TTL = 100000;
 
   // "I love you" state
   var LOVE_TOTAL = 5.6;
@@ -1005,12 +1005,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (!t) return;
     var nid = Math.random().toString(36).slice(2, 10);
     showToast('Sending note…');
-    sendReliable({ t: 'note', n: t, nid: nid }, function (okSent) {
+    sendReliable({ t: 'note', n: t, nid: nid }, function (okSent, code) {
       if (okSent) {
         var out = loadOut(); out[nid] = 0; saveOut(out);
         showToast('Note sent 💌 Hidden until they open the heart', 6000);
       } else {
-        showToast("Couldn't send the note. Check your connection and try again.", 7000);
+        showToast(code === 429 ? 'The free relay is limiting us right now (too many messages). Wait a few minutes and try again.'
+          : code > 0 ? "Couldn't send the note (relay error " + code + '). Try again.'
+          : "Couldn't reach the relay. Check your connection and try again.", 9000);
         composeInput.value = t;
         composeEl.hidden = false;
       }
@@ -1437,23 +1439,36 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     return obj;
   }
   // For messages that must arrive (notes, read receipts): checks the relay's answer and retries.
-  var RETRY_MS = [0, 1500, 4000];
+  // The free relay limits how often one phone may post. When it says "too many" (429) the
+  // unimportant chatter (presence pings, finger moves) pauses so notes and presses get through.
+  var RETRY_MS = [0, 3000, 8000, 15000, 25000];
+  var busyUntil = 0, reliableBusy = 0, lastPostAt = 0, lastRelayCode = 0;
+  function noteCode(r) {
+    var c = r && typeof r.status === 'number' ? r.status : 0;
+    lastRelayCode = c;
+    if (c === 429) busyUntil = Date.now() + 20000;
+    return c;
+  }
   function sendReliable(obj, onDone) {
-    if (splitOpen) { if (onDone) onDone(false); return; }
-    if (NS) { send(obj); if (onDone) onDone(true); return; }
+    if (splitOpen) { if (onDone) onDone(false, 0); return; }
+    if (NS) { send(obj); if (onDone) onDone(true, 200); return; }
     stamp(obj);
-    var i = 0;
+    var i = 0, code = 0;
+    reliableBusy++;
+    function finish(okSent) { reliableBusy = Math.max(0, reliableBusy - 1); if (onDone) onDone(okSent, code); }
     function attempt() {
       var failed = function () {
         i++;
         if (i < RETRY_MS.length) setTimeout(attempt, RETRY_MS[i]);
-        else if (onDone) onDone(false);
+        else finish(false);
       };
+      lastPostAt = Date.now();
       try {
         fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(obj) }).then(function (r) {
-          if (r && r.ok === false) failed(); else if (onDone) onDone(true);
-        }, failed);
-      } catch (e) { failed(); }
+          code = noteCode(r);
+          if (r && r.ok === false) failed(); else finish(true);
+        }, function () { code = -1; failed(); });
+      } catch (e) { code = -1; failed(); }
     }
     attempt();
   }
@@ -1465,8 +1480,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (sc) { try { sc.postMessage(JSON.stringify(obj)); } catch (e) {} }
       return;
     }
+    var chatter = obj.t === 'hi' || obj.t === 'hold' || (obj.t === 'touch' && obj.d === 0);
+    if (chatter && (reliableBusy > 0 || Date.now() < busyUntil)) return;
+    lastPostAt = Date.now();
     try {
-      fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: JSON.stringify(obj) }).catch(function () {});
+      fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: JSON.stringify(obj) }).then(noteCode, function () {});
     } catch (e) {}
   }
 
@@ -1589,7 +1607,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     });
   }
   startSession();
-  setInterval(function () { if (connected && document.visibilityState === 'visible') send({ t: 'hi' }); }, 20000);
+  // presence ping, only when nothing else was posted lately (every post already tells the other phone you are here)
+  setInterval(function () { if (connected && document.visibilityState === 'visible' && Date.now() - lastPostAt > 40000) send({ t: 'hi' }); }, 10000);
 
   if (!NS && 'serviceWorker' in navigator && location.protocol === 'https:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
@@ -1806,7 +1825,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       }
     }
     if (!pressed) return;
-    if (now - lastSend < 450) return;
+    if (now - lastSend < 1000) return;
     lastSend = now;
     touch(e, false);
   });
@@ -1889,7 +1908,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1931,6 +1950,16 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'luv') runFx('luvrain', {}, false);
     else if (a === 'split') { closeAdmin(); openSplit(); }
     else if (a === 'gold') { annivForce = !annivForce; updateAnniv(); }
+    else if (a === 'relay') {
+      showToast('Checking the relay…');
+      var t0 = Date.now();
+      try {
+        fetch(RELAY + '/' + topic + '?cache=no', { method: 'POST', body: JSON.stringify(stamp({ t: 'hi' })) }).then(function (r) {
+          var c = noteCode(r);
+          showToast(c === 429 ? 'Relay: 429, too many messages from this network right now' : 'Relay answered ' + c + (r.ok ? ' OK' : '') + ' in ' + (Date.now() - t0) + ' ms', 9000);
+        }, function (e) { showToast("Relay: couldn't reach it (" + (e && e.message || 'network error') + ')', 9000); });
+      } catch (e) { showToast('Relay: ' + e.message, 9000); }
+    }
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
       else showToast(navigator.vibrate(250) ? 'Buzz sent' : 'Buzz blocked: tap the page first');
