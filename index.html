@@ -494,7 +494,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     burst(cx + u * S, cy + v * S, mine ? MINE : THEIRS);
     // no buzzing a sleeping phone
     if (mine || !nightNow.me) {
-      try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {}
+      try { if (navigator.vibrate) navigator.vibrate(mine ? 25 : 70); } catch (e) {}
     }
   }
 
@@ -567,7 +567,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     loveNextRipple = nowS;
     loveEl.textContent = 'I love you';
     boost = 0.16;
-    if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([30, 60, 30, 60, 80]); } catch (e) {} }
+    if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([90, 60, 90, 60, 180]); } catch (e) {} }
   }
   function maybeLove() {
     var nowMs = performance.now();
@@ -1065,7 +1065,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last tickled', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1083,6 +1083,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'away1') showAway(1);
     else if (a === 'away9') showAway(9);
     else if (a === 'ripple') addTouch(0, 0, true);
+    else if (a === 'buzz') {
+      if (!navigator.vibrate) showToast("This browser can't vibrate");
+      else showToast(navigator.vibrate(250) ? 'Buzz sent' : 'Buzz blocked: tap the page first');
+    }
     else if (a === 'reset') {
       ovr = { heart: 'auto', time: 'auto', partner: 'auto', zone: 'auto', tickled: 'auto' };
       afterOvr();
