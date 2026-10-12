@@ -282,6 +282,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 
   var ripples = [];
   var sparks = [];
+  var kisses = [];
+  var kissUntil = 0;   // background kisses run until this time (seconds)
+  var kissNext = 0;
   var boost = 0;
   var last = 0;
   var phase = 0;
@@ -443,6 +446,60 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       sparks.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0, max: 0.6 + Math.random() * 0.6, r: 1 + Math.random() * 2.2, c: c });
     }
     if (sparks.length > 220) sparks.splice(0, sparks.length - 220);
+  }
+
+  // ---- Kisses: a double tap sends a few up from the heart; the secret sequence fills the background for 10 s ----
+  var KISS_BG_SECONDS = 10;
+  function addKiss(x, y, big) {
+    var now = performance.now() / 1000;
+    var a = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+    var sp = big ? 0 : 50 + Math.random() * 90;
+    kisses.push({
+      x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (big ? 12 + Math.random() * 14 : 0),
+      rot: (Math.random() - 0.5) * 0.9, vr: (Math.random() - 0.5) * 0.6,
+      size: big ? 22 + Math.random() * 40 : 26 + Math.random() * 22,
+      t0: now, max: big ? 2.4 + Math.random() * 1.4 : 1.6 + Math.random() * 0.8
+    });
+    if (kisses.length > 170) kisses.shift();
+  }
+  function kissBurst(u, v) {
+    var px = cx + u * S, py = cy + v * S;
+    for (var i = 0; i < 7; i++) addKiss(px + (Math.random() - 0.5) * 20, py, false);
+    boost = Math.min(boost + 0.06, 0.16);
+  }
+  function startKissRain(nowS) {
+    kissUntil = nowS + KISS_BG_SECONDS;
+    kissNext = 1;
+    boost = 0.16;
+    showToast('Kisses \uD83D\uDC8B');
+  }
+  function drawKisses(now, dt) {
+    if (now < kissUntil) {
+      kissNext += dt * 16;
+      while (kissNext >= 1) { kissNext -= 1; addKiss(Math.random() * W, Math.random() * H, true); }
+    }
+    if (!kisses.length) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var fade = kissUntil > now ? 1 : Math.max(0, 1 - (now - kissUntil) / 0.2);
+    for (var i = kisses.length - 1; i >= 0; i--) {
+      var kq = kisses[i];
+      var age = now - kq.t0;
+      if (age >= kq.max) { kisses.splice(i, 1); continue; }
+      kq.x += kq.vx * dt; kq.y += kq.vy * dt; kq.rot += kq.vr * dt;
+      var f = age / kq.max;
+      var al = Math.min(1, f / 0.15) * (1 - Math.pow(f, 2.2));
+      var pop = 0.6 + 0.4 * Math.min(1, age / 0.25);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, al) * 0.9;
+      ctx.translate(kq.x, kq.y);
+      ctx.rotate(kq.rot);
+      ctx.font = Math.round(kq.size * pop) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      ctx.fillText('\uD83D\uDC8B', 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   function addTouch(u, v, mine) {
@@ -623,6 +680,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       ctx.fillRect(0, 0, W, H);
     }
 
+    drawKisses(now, dt);
     drawRipples(now);
 
     var glowF = (1 - 0.7 * dull) * (1 - 0.3 * nightAmt);
@@ -832,6 +890,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
       maybeLove();
+    } else if (m.t === 'kiss') {
+      if (m.k === 'bg') startKissRain(tn / 1000);
+      else kissBurst(clampUnit(m.u), clampUnit(m.v));
+      if (!nightNow.me) { try { if (navigator.vibrate) navigator.vibrate([40, 40, 40]); } catch (e) {} }
     } else if (m.t === 'hold') {
       rp.holdAt = tn;
       maybeLove();
@@ -955,6 +1017,36 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   });
   window.addEventListener('pagehide', function () { lastSeenAt = Date.now(); saveSeen(); });
 
+  // Double tap = a few kisses. Bottom tip, then the left and right top bulges (any order) within a few seconds = kiss rain.
+  var lastTapAt = 0, lastTapU = 0, lastTapV = 0;
+  var seq = { tip: 0, left: 0, right: 0 };
+  function zoneOf(u, v) {
+    if (v > 6.5 && Math.abs(u) < 8) return 'tip';
+    if (v < 1 && u < -2) return 'left';
+    if (v < 1 && u > 2) return 'right';
+    return '';
+  }
+  function detectKisses(u, v) {
+    var now = performance.now();
+    if (now - lastTapAt < 350 && Math.abs(u - lastTapU) < 9 && Math.abs(v - lastTapV) < 9) {
+      lastTapAt = 0;
+      kissBurst(u, v);
+      send({ t: 'kiss', k: 'dbl', u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
+    } else {
+      lastTapAt = now; lastTapU = u; lastTapV = v;
+    }
+    var z = zoneOf(u, v);
+    if (!z) return;
+    seq[z] = now;
+    var SEQ_MS = 4000;
+    if (seq.tip && seq.left && seq.right && seq.tip < seq.left && seq.tip < seq.right &&
+        now - seq.tip < SEQ_MS && now - seq.left < SEQ_MS && now - seq.right < SEQ_MS) {
+      seq.tip = seq.left = seq.right = 0;
+      startKissRain(now / 1000);
+      send({ t: 'kiss', k: 'bg' });
+    }
+  }
+
   cv.addEventListener('pointerdown', function (e) {
     pressed = true;
     mineDown = true;
@@ -963,6 +1055,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     wake();
     touch(e, true);
     maybeLove();
+    detectKisses((e.clientX - cx) / S, (e.clientY - cy) / S);
     clearTimeout(holdTimer);
     holdTimer = setTimeout(sendHold, 400);
   });
@@ -1037,7 +1130,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
+  var ACTIONS = [['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['buzz', 'Buzz test'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -1055,6 +1148,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'away1') showAway(1);
     else if (a === 'away9') showAway(9);
     else if (a === 'ripple') addTouch(0, 0, true);
+    else if (a === 'kiss') startKissRain(performance.now() / 1000);
     else if (a === 'buzz') {
       if (!navigator.vibrate) showToast("This browser can't vibrate");
       else showToast(navigator.vibrate(250) ? 'Buzz sent' : 'Buzz blocked: tap the page first');
