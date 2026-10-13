@@ -153,7 +153,6 @@ body {
 
 /* Secret admin: hot corner, passphrase box, panel */
 .hot { position: fixed; top: 0; left: 0; width: 64px; height: calc(64px + env(safe-area-inset-top, 0px)); z-index: 30; background: transparent; touch-action: manipulation; }
-.love.grey { background: linear-gradient(100deg, #e8e8e8 0%, #8a8a8a 50%, #e8e8e8 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 1px 2px rgba(0,0,0,.8)) drop-shadow(0 0 12px rgba(200,200,200,.5)); }
 .gold {
   position: fixed; top: calc(env(safe-area-inset-top, 0px) + 44px); left: 0; right: 0; padding-inline: 24px; text-align: center;
   pointer-events: none; opacity: 0; transition: opacity 1.2s ease;
@@ -161,13 +160,6 @@ body {
   color: #fff3cf; text-shadow: 0 0 10px rgba(255, 190, 70, 0.95), 0 0 26px rgba(255, 150, 40, 0.7);
 }
 .gold.show { opacity: 1; }
-.whisky {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); transform: translateX(-50%); z-index: 35;
-  padding: 12px 22px; border-radius: 999px; text-decoration: none; white-space: nowrap;
-  font-family: var(--font-ui); font-size: 1rem; color: #f4e6cf; background: rgba(40, 30, 22, 0.88); border: 1px solid #c79b5a;
-  box-shadow: 0 0 18px rgba(199, 155, 90, 0.35);
-}
-.whisky[hidden] { display: none; }
 .panel {
   position: fixed; left: 50%; top: 36%; transform: translate(-50%, -50%); z-index: 40; width: min(88vw, 360px);
   padding: 18px; border-radius: 18px; background: rgba(26, 6, 20, 0.94); border: 1px solid rgba(255, 130, 190, 0.4);
@@ -257,7 +249,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <button class="invite" id="invite" type="button">Invite someone</button>
 </div>
 <div class="gold" id="gold"></div>
-<a class="whisky" id="whisky" href="https://www.google.com/search?q=order+japanese+whisky+online" target="_blank" rel="noopener" hidden>Order Japanese whiskey</a>
 <div class="panel" id="compose" hidden>
   <p>Hide a note for them. They see it the next time they open the heart.</p>
   <input id="composeInput" type="text" maxlength="140" autocomplete="off" aria-label="Note">
@@ -393,7 +384,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   var pixelUntil = 0, binUntil = 0, warpT0 = -99, confettiUntil = 0, confettiAcc = 0;
   var stag = null;            // {t0, dir}
-  var mT0 = -99;              // M mode (this phone only)
   var annivForce = false, annivToday = false;
   var luvUntil = 0, luvMode = 'luv', luvAcc = 0;   // background rain of I love yous
   var warpStars = [];
@@ -752,19 +742,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       }
     }
   }
-  function drawFinger(now) {
-    var p = (now - mT0) / 5;
-    if (p < 0 || p > 1) return;
-    var r = Math.min(1, p / 0.12, (1 - p) / 0.12);
-    r = r * r * (3 - 2 * r);
-    ctx.save();
-    ctx.font = Math.round(13 * S) + 'px ' + EMOJI_FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🖕', cx, cy - 6 * S - r * 11 * S);
-    ctx.restore();
-  }
-
   // ---- Effects: doing them ----
   var RIZZ = [
     "Are you Wi-Fi? Because I'm feeling a connection.",
@@ -885,21 +862,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (d.d != null) o.d = d.d;
     if (d.i != null) o.i = d.i;
     send(o);
-  }
-
-  // M mode: only on the phone that triggers it
-  var mTimer1 = 0, mTimer2 = 0;
-  var whiskyEl = document.getElementById('whisky');
-  function startM() {
-    var nowS = performance.now() / 1000;
-    mT0 = nowS;
-    cv.style.filter = 'grayscale(1) brightness(0.92)';
-    startLove(nowS, 'leave me alone', { quiet: true, grey: true });
-    whiskyEl.hidden = false;
-    clearTimeout(mTimer1); clearTimeout(mTimer2);
-    mTimer1 = setTimeout(function () { cv.style.filter = ''; }, 5000);
-    mTimer2 = setTimeout(function () { whiskyEl.hidden = true; }, 10000);
-    buzz([200, 80, 200], false);
   }
 
   // Anniversary
@@ -1215,10 +1177,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     loveStart = nowS;
     loveNextRipple = nowS;
     loveEl.textContent = text || 'I love you';
-    loveEl.classList.toggle('grey', !!o.grey);
     boost = 0.16;
     if (!o.quiet && !nightNow.me) vib([90, 60, 90, 60, 180]);
-    if (!o.grey) sfx('love');
+    sfx('love');
   }
   function maybeLove() {
     var nowMs = performance.now();
@@ -1337,7 +1298,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     drawKisses(now, dt);
     drawRipples(now);
-    drawFinger(now);
 
     var pixelOn = now < pixelUntil;
     if (pixelOn) drawPixelHeart(now, 1 + Math.round((k - 1) * 40) / 40, beat);
@@ -2108,10 +2068,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     taps.push({ t: now, u: u, v: v, inside: inside, dip: dip });
     while (taps.length > 6) taps.shift();
     var n = taps.length, t1 = taps[n - 1], t2 = taps[n - 2], t3 = taps[n - 3];
-    if (dip && t3 && t3.dip && t2.dip && now - t3.t < 900) {
-      taps.length = 0;
-      startM();
-    } else if (!inside && t3 && !t3.inside && !t2.inside && near(t1, t2) && near(t2, t3) && now - t3.t < 900) {
+    if (!inside && t3 && !t3.inside && !t2.inside && near(t1, t2) && near(t2, t3) && now - t3.t < 900) {
       taps.length = 0;
       doFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) });
     } else if (inside && !dip && t2 && t2.inside && !t2.dip && near(t1, t2) && now - t2.t < 350) {
@@ -2250,7 +2207,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['mmode', 'M mode'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -2280,7 +2237,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'confetti') runFx('confetti', {}, false);
     else if (a === 'rizz') runFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) }, false);
     else if (a === 'good') runFx('good', {}, true);
-    else if (a === 'mmode') startM();
     else if (a === 'note') openCompose();
     else if (a === 'ach') openAch();
     else if (a === 'clearach') {
