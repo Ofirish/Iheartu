@@ -561,7 +561,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
 
   function burst(px, py, c) {
-    for (var i = 0; i < 14; i++) {
+    var nb = sparks.length > 160 ? 4 : sparks.length > 90 ? 8 : 14;
+    for (var i = 0; i < nb; i++) {
       var ang = Math.random() * 6.283;
       var sp = 40 + Math.random() * 130;
       sparks.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0, max: 0.6 + Math.random() * 0.6, r: 1 + Math.random() * 2.2, c: c });
@@ -777,7 +778,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var CAP = window.Capacitor;
   var isApp = !!(CAP && typeof CAP.isNativePlatform === 'function' && CAP.isNativePlatform());
   function nativeHaptics() { return isApp && CAP.Plugins && CAP.Plugins.Haptics; }
+  var lastTick = -1e9;
   function vib(pat) {
+    if (typeof pat === 'number' && pat <= 80) {   // short taps: at most one every 90 ms
+      var nt = performance.now();
+      if (nt - lastTick < 90) return false;
+      lastTick = nt;
+    }
     var H = nativeHaptics();
     if (H) {
       var list = typeof pat === 'number' ? [pat] : pat, at = 0;
@@ -817,8 +824,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     o.connect(g); g.connect(a.destination);
     o.start(t0); o.stop(t0 + dur + 0.05);
   }
+  var lastSfx = {};
   function sfx(kind) {
     if (!soundOn || nightNow.me) return;
+    var ns = performance.now();
+    if (ns - (lastSfx[kind] || -1e9) < (kind === 'beat' || kind === 'kiss' ? 180 : 600)) return;
+    lastSfx[kind] = ns;
     var a = audio();
     if (!a || a.state !== 'running') return;
     var t = a.currentTime + 0.01;
@@ -1172,7 +1183,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       fogMsg.classList.add('done');
       vib([30, 60, 30]);
       logMsg('fog', '🌫 ' + fogItem.n);
-      doneSecret(fogItem, { k: 'fog' });
+      doneSecret(fogItem, { k: 'fog', i: fogItem.i });
     }
   }
   function openFog(item) {
@@ -1865,7 +1876,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var e = { m: js, ts: { '.sv': 'timestamp' } };
     if ((obj.t === 'note' || obj.t === 'fog' || obj.t === 'ask') && /^[a-z0-9]{1,16}$/.test(obj.nid || '')) return fbReq('PUT', '/notes/' + obj.nid, e);
     if (obj.t === 'anniv') return fbReq('PUT', '/anniv', e);
-    if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread' || obj.t === 'askans') return fbReq('POST', '/msgs', e);
+    if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread' || obj.t === 'askans' || obj.t === 'aggr') return fbReq('POST', '/msgs', e);
     e.q = Math.random().toString(36).slice(2, 10);
     return fbReq('PUT', '/live/' + me, e);
   }
@@ -1909,6 +1920,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     } catch (e) {}
   }
 
+  function pressCount(m) { var c = m.c | 0; return c > 1 ? Math.min(c, 50) : 1; }
   function clampUnit(n) { n = Number(n); if (!isFinite(n)) return 0; return Math.max(-3, Math.min(3, n)); }
 
   // One relay message. live=false for the saved history that is read when the page opens.
@@ -1923,7 +1935,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var tms = d.time ? d.time * 1000 : Date.now();
     var mineDev = m.dv === did;
     if (!mineDev && !paired) { paired = true; lsSet(K('paired'), 1); }
-    if (m.t === 'touch' && m.d === 1) { markDay(mineDev ? 'me' : 'them', tms); if (live) checkStreak(); }
+    if (m.t === 'touch' && m.d === 1) { markDay(mineDev ? 'me' : 'them', tms); if (live && Date.now() - lastStreakCheck > 5000) { lastStreakCheck = Date.now(); checkStreak(); } }
     if (m.t === 'anniv') adoptAnniv(m.d, m.at);
     else if (m.t === 'hi' && typeof m.an === 'string') adoptAnniv(m.an, m.at);
     if (m.t === 'note' && !mineDev && typeof m.n === 'string' && m.n && !noteSeenBefore(d.id)) {
@@ -1933,14 +1945,19 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     if ((m.t === 'fog' || m.t === 'ask') && !mineDev && typeof m.nid === 'string' && /^[a-z0-9]{1,16}$/.test(m.nid) && !noteSeenBefore(d.id)) {
       noteQueue.push(m.t === 'fog'
-        ? { kind: 'fog', n: FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length], nid: m.nid }
+        ? { kind: 'fog', i: Math.abs(m.i | 0) % FOG_MSGS.length, n: FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length], nid: m.nid }
         : { kind: 'ask', n: 'Tonight?', nid: m.nid });
       if (live) showNextNote();
     }
     if (m.t === 'noteread' && !mineDev && typeof m.nid === 'string') {
       var outN = loadOut();
-      var rtxt = m.k === 'fog' ? '😏 They wiped the fog off' : '💌 Your note was read';
+      var rtxt = m.k === 'fog' ? '😏 They wiped the fog and found: “' + FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length] + '”' : '💌 Your note was read';
       if (outN[m.nid] === 0) { outN[m.nid] = 1; saveOut(outN); showMsg(rtxt); logMsg('read', rtxt); }
+    }
+    if (m.t === 'aggr' && !mineDev && !noteSeenBefore(d.id)) {
+      showMsg('💥 You are aggressively loved');
+      logMsg('aggr', '💥 You are aggressively loved', tms);
+      if (live) buzz([80, 60, 80, 60, 250], true);
     }
     if (m.t === 'askans' && !mineDev && typeof m.nid === 'string') {
       var outA = loadOut();
@@ -1953,7 +1970,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     if (!live) {
       // history: count their presses made while you were away
-      if (m.t === 'touch' && m.d === 1 && !mineDev && lastSeenAt > 0 && tms >= lastSeenAt) pending++;
+      if (m.t === 'touch' && m.d === 1 && !mineDev && lastSeenAt > 0 && tms >= lastSeenAt) pending += pressCount(m);
       return;
     }
     if (m.id === me) return;
@@ -1967,10 +1984,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (isNew) send({ t: 'hi' });
     } else if (m.t === 'touch') {
       // a press that arrives while this page is hidden still counts as "loved while away" (the history replay later skips it as already seen)
-      if (m.d === 1 && document.visibilityState === 'hidden') { pending++; savePending(); }
+      if (m.d === 1 && document.visibilityState === 'hidden') { pending += pressCount(m); savePending(); }
       if (m.d === 1) sfx('beat');
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
+      if (pressCount(m) > 1) setTimeout(function () { addTouch(clampUnit(m.u) + (Math.random() - 0.5) * 3, clampUnit(m.v) + (Math.random() - 0.5) * 3, false); }, 110);
       maybeLove();
     } else if (m.t === 'fx' && FX_OK[m.k] === 1) {
       runFx(m.k, { u: clampUnit(m.u), v: clampUnit(m.v), d: m.d === -1 ? -1 : 1, i: Number(m.i) || 0 }, true);
@@ -2130,6 +2148,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
 
   function startSession() {
+    sessionTaps = 0; aggrDone = false;   // a new visit starts a new count
     if (!NS) catchingUp = true;
     if (useFb && !NS) { openFb(); return; }
     if (NS) {   // test pane: no relay, no history, just the other pane
@@ -2185,15 +2204,42 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     holdTimer = setTimeout(sendHold, 4000);
   }
 
+  // Fast tapping: every tap shows here at once, but taps closer than 220 ms travel together as one
+  // message with a count (c), so the relay, the other phone and the battery don't choke.
+  var PRESS_GAP = 220, lastPressSentAt = -1e9, pressBuf = 0, pressTimer = 0, pressUV = null;
+  function sendPress(u, v) {
+    var now = performance.now();
+    if (!pressTimer && now - lastPressSentAt >= PRESS_GAP) {
+      lastPressSentAt = now;
+      send({ t: 'touch', d: 1, u: u, v: v });
+      return;
+    }
+    pressBuf++;
+    pressUV = [u, v];
+    if (!pressTimer) pressTimer = setTimeout(function () {
+      pressTimer = 0;
+      lastPressSentAt = performance.now();
+      var c = pressBuf; pressBuf = 0;
+      send({ t: 'touch', d: 1, u: pressUV[0], v: pressUV[1], c: c });
+    }, Math.max(0, PRESS_GAP - (now - lastPressSentAt)));
+  }
+  var lastTouchSave = 0, lastStreakCheck = -1e9;
   function touch(e, isDown) {
     var u = (e.clientX - cx) / S;
     var v = (e.clientY - cy) / S;
-    lastTouchAt = Math.max(lastTouchAt, Date.now());
-    lsSet(K('lasttouch'), lastTouchAt);
-    if (isDown) { markDay('me', Date.now()); checkStreak(); countSent(); }
+    var nowMs = Date.now();
+    lastTouchAt = Math.max(lastTouchAt, nowMs);
+    if (nowMs - lastTouchSave > 1000) { lastTouchSave = nowMs; lsSet(K('lasttouch'), lastTouchAt); }
+    if (isDown) {
+      markDay('me', nowMs);
+      if (nowMs - lastStreakCheck > 5000) { lastStreakCheck = nowMs; checkStreak(); }
+      countSent();
+    }
     if (pending > 0) { showAway(pending); pending = 0; savePending(); }
     addTouch(u, v, true);
-    send({ t: 'touch', d: isDown ? 1 : 0, u: Math.round(u * 100) / 100, v: Math.round(v * 100) / 100 });
+    var ru = Math.round(u * 100) / 100, rv = Math.round(v * 100) / 100;
+    if (isDown) sendPress(ru, rv);
+    else send({ t: 'touch', d: 0, u: ru, v: rv });
   }
 
   function wake() {
@@ -2273,6 +2319,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   // holding together for "I love you" must never send a secret by accident
   function quietMoment() { var n = performance.now(); return !remoteActive(n) && n / 1000 - loveStart > 2.5; }
+  var lastKissAt = -1e9, lastWantAt = -1e9;
   function gestureDown(p, u, v, now) {
     if (now / 1000 < luvUntil && luvMode === 'luv' && hitLove(p.x0, p.y0)) {
       p.done = true;
@@ -2315,14 +2362,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var n = taps.length, t1 = taps[n - 1], t2 = taps[n - 2], t3 = taps[n - 3];
     if (dip && t3 && t3.dip && t2.dip && now - t3.t < 900) {
       taps.length = 0;
-      doFx('want', {});
+      if (now - lastWantAt > 3000) { lastWantAt = now; doFx('want', {}); }
     } else if (!inside && t3 && !t3.inside && !t2.inside && near(t1, t2) && near(t2, t3) && now - t3.t < 900) {
       taps.length = 0;
       doFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) });
     } else if (inside && !dip && t2 && t2.inside && !t2.dip && near(t1, t2) && now - t2.t < 350) {
       taps.length = 0;
       if (loveAmount(now / 1000) > 0.15) doFx('iluToo', {});
-      else doFx('kiss', { u: u, v: v });
+      else if (now - lastKissAt > 700) { lastKissAt = now; doFx('kiss', { u: u, v: v }); }   // tapping like crazy: one kiss burst at a time
     }
     var z = outsideZone(u, v);
     if (z && !inside) {
@@ -2338,7 +2385,20 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     kissSequence(u, v, now);
   }
 
+  // 200 taps in one visit: love aggression
+  var sessionTaps = 0, aggrDone = false;
+  function countTap() {
+    sessionTaps++;
+    if (sessionTaps >= 200 && !aggrDone) {
+      aggrDone = true;
+      showMsg('🚨 Love aggression identified');
+      logMsg('aggr', '🚨 Love aggression identified');
+      vib([80, 60, 80, 60, 80, 60, 250]);
+      sendReliable({ t: 'aggr' });
+    }
+  }
   cv.addEventListener('pointerdown', function (e) {
+    countTap();
     var now = performance.now();
     var u = (e.clientX - cx) / S, v = (e.clientY - cy) / S;
     var id = e.pointerId == null ? 0 : e.pointerId;
@@ -2401,7 +2461,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     mineDown = false;
     mineUpAt = performance.now();
     lastTouchAt = Math.max(lastTouchAt, Date.now());
-    lsSet(K('lasttouch'), lastTouchAt);
+    if (Date.now() - lastTouchSave > 1000) { lastTouchSave = Date.now(); lsSet(K('lasttouch'), lastTouchAt); }
     clearTimeout(holdTimer);
     if (holdSent) { holdSent = false; send({ t: 'up' }); }
   }
