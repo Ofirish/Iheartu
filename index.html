@@ -105,6 +105,21 @@ body {
 .fog.gone { opacity: 0; pointer-events: none; }
 #askPanel .q { font-family: var(--font-display); font-style: italic; font-size: 2.2rem; margin: 4px 0 6px; text-shadow: 0 0 16px rgba(255,60,90,.9); }
 #askPanel button { font-size: 1.05rem; padding: 11px 18px; }
+/* moods */
+.moodchip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 12px; border-radius: 999px; font-family: var(--font-ui); font-size: .9rem; color: #ffe9f7; background: rgba(19,3,14,.55); border: 1px solid var(--mc, #ff82be); box-shadow: 0 0 12px var(--mc, #ff82be); pointer-events: auto; cursor: pointer; }
+.moodchip[hidden] { display: none; }
+.moodchip small { opacity: .6; font-size: .72rem; }
+#moodPanel .grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0 10px; max-height: 40vh; overflow: auto; }
+#moodPanel .grid button { padding: 8px 12px; border-color: var(--mc); box-shadow: inset 0 0 0 1px var(--mc); }
+#moodPanel .grid button.on { background: var(--mc); color: #13030e; }
+#moodPanel .me { font-size: .85rem; opacity: .75; margin: 0 0 8px; }
+#moodPanel .add { display: flex; gap: 6px; margin-top: 8px; }
+#moodPanel .add input { padding: 8px; }
+#moodPanel .add input.emo { width: 3.2em; flex: none; text-align: center; }
+#moodPanel .sw { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+#moodPanel .sw button { width: 26px; height: 26px; padding: 0; border-radius: 50%; background: var(--mc); border: 2px solid transparent; }
+#moodPanel .sw button.on { border-color: #fff; }
+#moodPanel .addbox[hidden] { display: none; }
 #joinPanel .err { color: #ff9ab8; font-size: .85rem; margin: 8px 0 0; }
 #joinPanel .err[hidden] { display: none; }
 .mail::after { content: ""; position: absolute; inset: -8px; }
@@ -138,7 +153,7 @@ body {
   top: 42%;
   transform: translate(-50%, -50%);
   width: max-content;
-  max-width: 94vw;
+  max-width: 88vw;
   margin: 0;
   opacity: 0;
   visibility: hidden;
@@ -146,8 +161,11 @@ body {
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.12;
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+  padding: 0 0.1em 0.1em;
   background: linear-gradient(100deg, #ffb3e6 0%, #e2bbff 35%, #b890ff 65%, #ffb3e6 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -254,6 +272,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 <div class="caption" aria-live="polite">
   <p class="hint">Touch the heart</p>
   <p class="status" id="status"></p>
+  <button type="button" class="moodchip" id="moodChip" hidden></button>
   <p class="note" id="note"></p>
   <button class="invite" id="invite" type="button">Invite someone</button>
 </div>
@@ -279,6 +298,17 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 <div class="panel" id="askPanel" hidden>
   <p class="q">🔥 Tonight?</p>
   <div class="row"><button type="button" id="askYes">😈 Yes</button><button type="button" id="askLater">😇 Maybe later</button></div>
+</div>
+<div class="panel" id="moodPanel" hidden>
+  <p>How do you feel?</p>
+  <p class="me" id="moodMe"></p>
+  <div class="grid" id="moodGrid"></div>
+  <div class="addbox" id="moodAddBox" hidden>
+    <div class="add"><input class="emo" id="moodEmo" maxlength="4" aria-label="Emoji" placeholder="🙂"><input id="moodLabel" maxlength="18" aria-label="Mood name" placeholder="New mood"></div>
+    <div class="sw" id="moodSw"></div>
+    <div class="row"><button type="button" id="moodAddSave">Add for both of us</button></div>
+  </div>
+  <div class="row"><button type="button" id="moodAdd">+ New mood</button><button type="button" id="moodClear">Clear mine</button><button type="button" id="moodClose">Close</button></div>
 </div>
 <div class="panel" id="joinPanel" hidden>
   <p>Join your partner's heart: paste the room link they sent you (it ends with # and some letters).</p>
@@ -399,6 +429,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   var pixelUntil = 0, binUntil = 0, warpT0 = -99, confettiUntil = 0, confettiAcc = 0;
   var wantT0 = -99, teaseT0 = -99, blushHold = false, steam = [];   // naughty effects
+  var tardisT0 = -99, matrixT0 = -99, sunT0 = -99, matrixCols = null;
+  var moodTint = null;   // the partner's mood colour on the heart, 'r,g,b'
   var stag = null;            // {t0, dir}
   var annivForce = false, annivToday = false;
   var luvUntil = 0, luvMode = 'luv', luvAcc = 0;   // background rain of I love yous
@@ -772,7 +804,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     "Do you believe in love at first swipe?",
     "If you were a triangle, you'd be acute one."
   ];
-  var FX_OK = { want: 1, tease: 1, luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
+  var FX_OK = { tardis: 1, matrix: 1, want: 1, tease: 1, luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
   // ---- Vibration and sound ----
   // Inside the Android app the phone's own vibration motor is used (no "touch the page first" rule).
   var CAP = window.Capacitor;
@@ -842,6 +874,18 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       tone(a, 'sine', 1568, 1568, t, 1.6, 0.2); tone(a, 'sine', 2349, 2349, t, 1.0, 0.07); tone(a, 'sine', 784, 784, t, 1.2, 0.08);
     } else if (kind === 'kiss') {   // pop
       tone(a, 'sine', 500, 1300, t, 0.09, 0.25); tone(a, 'sine', 600, 1500, t + 0.12, 0.09, 0.2);
+    } else if (kind === 'tardis') { // a wheezing, groaning whoosh, three times
+      var o = a.createOscillator(), o2 = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+      o.type = 'sawtooth'; o2.type = 'triangle';
+      f.type = 'lowpass'; f.frequency.setValueAtTime(700, t);
+      for (var w = 0; w < 3; w++) {
+        var w0 = t + w * 1.05;
+        o.frequency.setValueAtTime(70, w0); o.frequency.exponentialRampToValueAtTime(190, w0 + 0.5); o.frequency.exponentialRampToValueAtTime(65, w0 + 1.0);
+        o2.frequency.setValueAtTime(140, w0); o2.frequency.exponentialRampToValueAtTime(400, w0 + 0.5); o2.frequency.exponentialRampToValueAtTime(130, w0 + 1.0);
+        g.gain.setValueAtTime(0.0001, w0); g.gain.exponentialRampToValueAtTime(0.16, w0 + 0.45); g.gain.exponentialRampToValueAtTime(0.0001, w0 + 1.02);
+      }
+      o.connect(f); o2.connect(f); f.connect(g); g.connect(a.destination);
+      o.start(t); o2.start(t); o.stop(t + 3.3); o2.stop(t + 3.3);
     } else if (kind === 'msg') {    // soft ding
       tone(a, 'sine', 1318.5, 1318.5, t, 0.9, 0.14); tone(a, 'sine', 1975.5, 1975.5, t + 0.1, 0.9, 0.08);
     }
@@ -871,6 +915,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     else if (k === 'confetti') { confettiUntil = nowS + 3; buzz([40, 40, 40, 40, 40], remote); }
     else if (k === 'rizz') showToast(RIZZ[(Math.abs(d.i | 0)) % RIZZ.length]);
+    else if (k === 'tardis') {    // the heart dematerialises and comes back bigger on the inside
+      tardisT0 = nowS;
+      sfx('tardis');
+      setTimeout(function () { startLove(performance.now() / 1000, 'My love is bigger on the inside', { quiet: true }); }, 2600);
+      buzz([60, 120, 60, 120, 60, 120, 200], remote);
+    }
+    else if (k === 'matrix') { matrixT0 = nowS; matrixCols = null; buzz([20, 40, 20, 40, 20, 40, 20], remote); }
     else if (k === 'want') {      // blushing, steaming heart
       wantT0 = nowS; boost = 0.16;
       startLove(nowS, 'I want you! now!', { quiet: true });
@@ -1027,6 +1078,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   document.getElementById('achClose').addEventListener('click', function () { achEl.hidden = true; });
   var statusTapAt = -1e9;
   statusEl.addEventListener('click', function () {
+    if (statusHeld) { statusHeld = false; return; }
     var now = performance.now();
     if (now - statusTapAt < 450) { statusTapAt = 0; openAch(); } else statusTapAt = now;
   });
@@ -1225,6 +1277,133 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     askItem = null; noteShowing = false; showNextNote();
   }
   document.getElementById('askYes').addEventListener('click', function () { answerAsk('yes'); });
+
+  // ---- Moods: each of you can set one, the other's heart takes its colour; either of you can add new moods for both ----
+  var MOODS = [
+    { id: 'cuddly', e: '🧸', l: 'Cuddly', c: '255,143,199' },
+    { id: 'tired', e: '😴', l: 'Tired', c: '157,140,255' },
+    { id: 'playful', e: '😜', l: 'Playful', c: '255,173,77' },
+    { id: 'frisky', e: '😈', l: 'Frisky', c: '255,42,77' },
+    { id: 'missing', e: '🥺', l: 'Missing you', c: '90,167,255' },
+    { id: 'stressed', e: '😣', l: 'Stressed', c: '127,184,154' }
+  ];
+  var SWATCH = ['255,143,199', '255,42,77', '255,173,77', '255,226,90', '127,184,154', '90,167,255', '157,140,255', '240,240,240'];
+  function jsonGet(k, d) { try { var v = JSON.parse(lsGet(K(k)) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+  var moodCustom = {}, myMood = null, theirMood = null;
+  function cleanMood(o) {
+    if (!o || typeof o !== 'object') return null;
+    var e = typeof o.e === 'string' ? Array.from(o.e.trim()).slice(0, 4).join('') : '';
+    var l = typeof o.l === 'string' ? o.l.trim().slice(0, 18) : '';
+    var c = typeof o.c === 'string' && /^\d{1,3},\d{1,3},\d{1,3}$/.test(o.c) ? o.c : '255,143,199';
+    return l || e ? { e: e, l: l, c: c } : null;
+  }
+  function loadMoods() { moodCustom = jsonGet('moodcustom', {}) || {}; myMood = jsonGet('moodmine', null); theirMood = jsonGet('moodtheirs', null); }
+  function allMoods() { return MOODS.concat(Object.keys(moodCustom).map(function (k) { var o = cleanMood(moodCustom[k]); return o ? { id: k, e: o.e, l: o.l, c: o.c } : null; }).filter(Boolean)); }
+  var moodChip = document.getElementById('moodChip'), moodPanel = document.getElementById('moodPanel');
+  function renderMood() {
+    var show = theirMood && theirMood.mo && String(theirMood.at) !== lsGet(K('mooddis'));
+    moodTint = show ? theirMood.mo.c : null;
+    moodChip.hidden = !show;
+    if (show) {
+      moodChip.style.setProperty('--mc', 'rgb(' + theirMood.mo.c + ')');
+      moodChip.textContent = '';
+      moodChip.appendChild(document.createTextNode(theirMood.mo.e + ' ' + theirMood.mo.l + ' '));
+      var sm = document.createElement('small'); sm.textContent = '· their mood'; moodChip.appendChild(sm);
+    }
+  }
+  function adoptMood(m, mineDev, live) {
+    var mo = cleanMood(m.mo), at = m.at;
+    if (mineDev) {   // my own mood, from this phone's other tab or an earlier visit
+      if (!myMood || at > myMood.at) { myMood = { mo: mo, at: at }; lsSet(K('moodmine'), JSON.stringify(myMood)); }
+      return;
+    }
+    if (theirMood && at <= theirMood.at) return;
+    theirMood = { mo: mo, at: at };
+    lsSet(K('moodtheirs'), JSON.stringify(theirMood));
+    renderMood();
+    if (mo && live) { logMsg('mood', 'Their mood: ' + mo.e + ' ' + mo.l); vib([30, 50, 30]); }
+  }
+  function adoptMoodAdd(m) {
+    var mo = cleanMood(m.mo);
+    if (!mo || typeof m.mid !== 'string' || !/^[a-z0-9]{1,16}$/.test(m.mid)) return;
+    moodCustom[m.mid] = mo;
+    lsSet(K('moodcustom'), JSON.stringify(moodCustom));
+    if (!moodPanel.hidden) fillMoodPanel();
+  }
+  moodChip.addEventListener('click', function (e) {   // dismiss their mood on this phone
+    e.stopPropagation();
+    if (theirMood) lsSet(K('mooddis'), String(theirMood.at));
+    renderMood();
+  });
+  var moodSw = '255,143,199';
+  function fillMoodPanel() {
+    var grid = document.getElementById('moodGrid');
+    grid.textContent = '';
+    allMoods().forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = o.e + ' ' + o.l;
+      b.style.setProperty('--mc', 'rgb(' + o.c + ')');
+      if (myMood && myMood.mo && myMood.mo.l === o.l && myMood.mo.e === o.e) b.className = 'on';
+      b.addEventListener('click', function () { setMyMood({ e: o.e, l: o.l, c: o.c }); });
+      grid.appendChild(b);
+    });
+    document.getElementById('moodMe').textContent = myMood && myMood.mo ? 'You: ' + myMood.mo.e + ' ' + myMood.mo.l : 'Pick one. Their heart takes its colour.';
+    var sw = document.getElementById('moodSw');
+    sw.textContent = '';
+    SWATCH.forEach(function (c) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', 'Colour');
+      b.style.setProperty('--mc', 'rgb(' + c + ')');
+      if (c === moodSw) b.className = 'on';
+      b.addEventListener('click', function () { moodSw = c; fillMoodPanel(); });
+      sw.appendChild(b);
+    });
+  }
+  function openMood() { document.getElementById('moodAddBox').hidden = true; fillMoodPanel(); moodPanel.hidden = false; }
+  function setMyMood(mo) {
+    var at = Date.now();
+    myMood = { mo: mo, at: at };
+    lsSet(K('moodmine'), JSON.stringify(myMood));
+    sendReliable({ t: 'mood', mo: mo, at: at });
+    moodPanel.hidden = true;
+    showToast(mo ? 'Your mood: ' + mo.e + ' ' + mo.l : 'Mood cleared', 3000);
+  }
+  document.getElementById('moodClear').addEventListener('click', function () { setMyMood(null); });
+  document.getElementById('moodClose').addEventListener('click', function () { moodPanel.hidden = true; });
+  document.getElementById('moodAdd').addEventListener('click', function () {
+    var box = document.getElementById('moodAddBox');
+    box.hidden = !box.hidden;
+    if (!box.hidden) { try { document.getElementById('moodLabel').focus(); } catch (e) {} }
+  });
+  document.getElementById('moodAddSave').addEventListener('click', function () {
+    var mo = cleanMood({ e: document.getElementById('moodEmo').value || '💗', l: document.getElementById('moodLabel').value, c: moodSw });
+    if (!mo || !mo.l) { showToast('Give the mood a name', 2000); return; }
+    var mid = Math.random().toString(36).slice(2, 10);
+    moodCustom[mid] = mo;
+    lsSet(K('moodcustom'), JSON.stringify(moodCustom));
+    sendReliable({ t: 'moodadd', mid: mid, mo: mo });
+    document.getElementById('moodEmo').value = ''; document.getElementById('moodLabel').value = '';
+    document.getElementById('moodAddBox').hidden = true;
+    fillMoodPanel();
+    showToast('Added for both of you', 2000);
+  });
+  // long press the status line to pick a mood (a double tap still opens the achievements)
+  var statusHold = 0, statusHeld = false;
+  statusEl.addEventListener('pointerdown', function () { statusHeld = false; clearTimeout(statusHold); statusHold = setTimeout(function () { statusHeld = true; openMood(); }, 700); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { statusEl.addEventListener(ev, function () { clearTimeout(statusHold); }); });
+
+  // ---- Good morning: the first time each phone opens the heart between 07:00 and 12:00 ----
+  function maybeGoodMorning() {
+    var h = new Date().getHours();
+    if (h < 7 || h >= 12 || document.visibilityState !== 'visible') return;
+    var dk = dayKey(Date.now());
+    if (lsGet(K('gm')) === dk) return;
+    lsSet(K('gm'), dk);
+    sunT0 = performance.now() / 1000;
+    setTimeout(function () { startLove(performance.now() / 1000, 'Good morning, my love ☀️', { quiet: true }); sfx('love'); }, 1600);
+  }
   document.getElementById('askLater').addEventListener('click', function () { answerAsk('later'); });
   noteBox.addEventListener('click', function () { noteBox.hidden = true; noteShowing = false; showNextNote(); });
   function openCompose() { composeInput.value = ''; composeEl.hidden = false; try { composeInput.focus(); } catch (e) {} }
@@ -1392,6 +1571,99 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  // Tardis: 0-1.6 s spin and shrink away, 2.0-3.4 s flicker back in, overshoot, settle
+  function tardisState(now) {
+    var t = now - tardisT0;
+    if (t < 0 || t > 4.2) return null;
+    var sc = 1, rot = 0, al = 1;
+    if (t < 1.6) { var e = t / 1.6; sc = 1 - 0.97 * e * e; rot = e * e * 9; al = 1 - 0.6 * e; }
+    else if (t < 2.0) { sc = 0.03; al = 0; }
+    else if (t < 3.4) { var e2 = (t - 2.0) / 1.4; sc = 0.2 + 1.05 * e2; al = (0.55 + 0.45 * Math.sin(e2 * Math.PI * 6)) * e2; rot = (1 - e2) * -2; }
+    else { var e3 = (t - 3.4) / 0.8; sc = 1.25 - 0.25 * e3; al = 1; }
+    var light = t < 3.6 ? 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 0.9) : Math.max(0, 1 - (t - 3.6) / 0.6);
+    return { sc: sc, rot: rot, al: al, light: light };
+  }
+  function drawTardisLight(now) {
+    var st = tardisState(now);
+    if (!st) return;
+    var g = ctx.createRadialGradient(cx, cy, S, cx, cy, Math.max(W, H) * 0.6);
+    g.addColorStop(0, 'rgba(90,150,255,' + (0.45 * st.light) + ')');
+    g.addColorStop(0.4, 'rgba(40,80,200,' + (0.2 * st.light) + ')');
+    g.addColorStop(1, 'rgba(20,40,120,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // Matrix rain in pink, with "DADDY ♥ TOY" decoding in the middle
+  var MX_CH = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ハヒフヘホマミムメモヤユヨラリルレロワ♥';
+  var MX_MSG = 'DADDY ♥ TOY';
+  function drawMatrix(now, dt) {
+    var t = now - matrixT0;
+    if (t < 0 || t > 10.5) return;
+    var fade = Math.min(1, t / 0.6, (10.5 - t) / 1);
+    var cw = Math.max(16, Math.round(W / 24)), fs = Math.round(cw * 0.9);
+    if (!matrixCols) {
+      matrixCols = [];
+      for (var c = 0; c * cw < W; c++) matrixCols.push({ y: -Math.random() * H, sp: 90 + Math.random() * 160, ch: [] });
+    }
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = 'rgba(8,0,6,0.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = fs + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var i = 0; i < matrixCols.length; i++) {
+      var col = matrixCols[i];
+      col.y += col.sp * dt;
+      if (col.y - 14 * cw > H) { col.y = -Math.random() * H * 0.3; col.sp = 90 + Math.random() * 160; }
+      var x = i * cw + cw / 2;
+      for (var j = 0; j < 14; j++) {
+        var y = col.y - j * cw;
+        if (y < -cw || y > H) continue;
+        if (!col.ch[j] || Math.random() < 0.04) col.ch[j] = MX_CH.charAt(Math.floor(Math.random() * MX_CH.length));
+        ctx.fillStyle = j === 0 ? 'rgba(255,230,245,0.95)' : 'rgba(255,79,163,' + (0.85 * (1 - j / 14)) + ')';
+        ctx.fillText(col.ch[j], x, y);
+      }
+    }
+    // the message decodes letter by letter, holds, scrambles away, repeats every 4 s
+    var ph = (t % 4) / 4, n = MX_MSG.length, big = Math.round(Math.min(W / (n * 0.75), 12 * S / 3.2));
+    if (ph < 0.8) {
+      ctx.font = 'bold ' + big + 'px monospace';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(255,79,163,1)';
+      ctx.shadowBlur = 18 * dpr;
+      var shown = Math.min(n, Math.floor(ph / 0.35 * n) + 1), w = big * 0.62;
+      var y0 = Math.max(big, cy - 16.5 * S);
+      for (var k = 0; k < n; k++) {
+        var chx = MX_MSG.charAt(k);
+        if (chx === ' ') continue;
+        var real = k < shown && ph < 0.7;
+        ctx.fillStyle = chx === '♥' && real ? 'rgba(255,60,120,1)' : 'rgba(255,240,250,' + (real ? 1 : 0.55) + ')';
+        ctx.fillText(real ? chx : MX_CH.charAt(Math.floor(Math.random() * MX_CH.length)), cx + (k - (n - 1) / 2) * w, y0);
+      }
+    }
+    ctx.restore();
+  }
+  // Good morning: a sunrise over the background
+  function drawSunrise(now) {
+    var t = now - sunT0;
+    if (t < 0 || t > 8) return;
+    var a = Math.min(1, t / 1.2, (8 - t) / 1.5), rise = Math.min(1, t / 5);
+    var sky = ctx.createLinearGradient(0, H, 0, 0);
+    sky.addColorStop(0, 'rgba(255,170,90,' + (0.75 * a) + ')');
+    sky.addColorStop(0.35, 'rgba(255,110,140,' + (0.5 * a) + ')');
+    sky.addColorStop(1, 'rgba(120,60,140,' + (0.15 * a) + ')');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    var sy = H + 40 * S / 10 - rise * H * 0.32, sr = Math.min(W, H) * 0.16;
+    var sun = ctx.createRadialGradient(cx, sy, 0, cx, sy, sr * 2.4);
+    sun.addColorStop(0, 'rgba(255,245,200,' + a + ')');
+    sun.addColorStop(0.35, 'rgba(255,200,110,' + (0.85 * a) + ')');
+    sun.addColorStop(1, 'rgba(255,140,80,0)');
+    ctx.fillStyle = sun;
+    ctx.fillRect(cx - sr * 2.4, sy - sr * 2.4, sr * 4.8, sr * 4.8);
+  }
+
   // steam puffs rising off a blushing heart
   function drawSteam(now, dt, blush) {
     if (blush > 0.2 && steam.length < 40 && Math.random() < 0.5) {
@@ -1490,6 +1762,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
 
     drawGalaxy(now);
+    drawSunrise(now);
+    drawMatrix(now, dt);
+    drawTardisLight(now);
     drawWarp(now);
 
     var auraF = (1 - 0.65 * dull) * (1 - 0.4 * nightAmt);
@@ -1531,11 +1806,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (pixelOn) drawPixelHeart(now, 1 + Math.round((k - 1) * 40) / 40, beat);
     else {
     var glowF = (1 - 0.7 * dull) * (1 - 0.3 * nightAmt);
+    var td = tardisState(now);
     ctx.save();
     ctx.translate(cx, cy + 9 * S);   // sway pivots on the tip
     ctx.rotate(sway);
     ctx.translate(0, -9 * S);
-    ctx.scale(S * k, S * k);
+    if (td) { ctx.rotate(td.rot); ctx.globalAlpha = td.al; }
+    ctx.scale(S * k * (td ? td.sc : 1), S * k * (td ? td.sc : 1));
     var gr = Math.round(255 - 85 * love), gg = Math.round(79 + 31 * love), gb = Math.round(163 + 92 * love);
     ctx.shadowColor = 'rgba(' + gr + ',' + gg + ',' + gb + ',' + (0.95 * (1 - 0.5 * dull)) + ')';
     ctx.shadowBlur = (28 + 36 * beat + boost * 220 + love * 30) * glowF * dpr;
@@ -1558,6 +1835,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     if (blush > 0) {
       ctx.fillStyle = 'rgba(205,0,35,' + (0.55 * blush) + ')';
+      ctx.fillRect(-16, -16, 32, 32);
+    }
+    if (moodTint && blush < 0.5) {
+      ctx.fillStyle = 'rgba(' + moodTint + ',' + (0.42 * (1 - blush)) + ')';
       ctx.fillRect(-16, -16, 32, 32);
     }
     var gf = 1 - 0.75 * dull;
@@ -1675,6 +1956,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (lsGet(K('anniv')) && !lsGet(K('annivat'))) lsSet(K('annivat'), 1);   // saved before dates were shared
     sentCount = parseInt(lsGet(K('sent')), 10) || 0;
     try { ach = JSON.parse(lsGet(K('ach')) || '{}') || {}; } catch (e) { ach = {}; }
+    loadMoods();
+    renderMood();
   }
   initPersisted();
 
@@ -1870,12 +2153,15 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   // One post to the relay. On Firebase: lasting things (presses, notes, receipts, anniversary) are stored,
   // passing things (moves, holds, effects, presence) overwrite this page's single "live" slot.
+  function safeKey(k) { k = String(k || ''); return /^[A-Za-z0-9_-]{1,40}$/.test(k) ? k : 'x' + Math.abs(k.split('').reduce(function (h, c) { return (h * 31 + c.charCodeAt(0)) | 0; }, 7)); }
   function relayPost(obj) {
     var js = JSON.stringify(obj);
     if (!useFb) return fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: js });
     var e = { m: js, ts: { '.sv': 'timestamp' } };
     if ((obj.t === 'note' || obj.t === 'fog' || obj.t === 'ask') && /^[a-z0-9]{1,16}$/.test(obj.nid || '')) return fbReq('PUT', '/notes/' + obj.nid, e);
     if (obj.t === 'anniv') return fbReq('PUT', '/anniv', e);
+    if (obj.t === 'mood') return fbReq('PUT', '/mood/' + safeKey(did), e);
+    if (obj.t === 'moodadd' && /^[a-z0-9]{1,16}$/.test(obj.mid || '')) return fbReq('PUT', '/moodlist/' + obj.mid, e);
     if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread' || obj.t === 'askans' || obj.t === 'aggr') return fbReq('POST', '/msgs', e);
     e.q = Math.random().toString(36).slice(2, 10);
     return fbReq('PUT', '/live/' + me, e);
@@ -1954,6 +2240,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var rtxt = m.k === 'fog' ? '😏 They wiped the fog and found: “' + FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length] + '”' : '💌 Your note was read';
       if (outN[m.nid] === 0) { outN[m.nid] = 1; saveOut(outN); showMsg(rtxt); logMsg('read', rtxt); }
     }
+    if (m.t === 'mood' && typeof m.at === 'number') adoptMood(m, mineDev, live);
+    if (m.t === 'moodadd') adoptMoodAdd(m);
     if (m.t === 'aggr' && !mineDev && !noteSeenBefore(d.id)) {
       showMsg('💥 You are aggressively loved');
       logMsg('aggr', '💥 You are aggressively loved', tms);
@@ -2008,6 +2296,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var catchingUp = false;   // true while the saved messages are being read after opening or returning
   function historyDone() {
     catchingUp = false;
+    setTimeout(maybeGoodMorning, 400);
     savePending();
     checkStreak();
     showNextNote();
@@ -2064,6 +2353,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     Object.keys(msgs).forEach(function (k) { list.push(['m' + k, msgs[k]]); });
     Object.keys(notes).forEach(function (k) { list.push(['n' + k, notes[k]]); });
     if (data.anniv) list.push(['a' + (data.anniv.ts || 0), data.anniv]);
+    var mdl = data.moodlist || {}, mdn = data.mood || {};
+    Object.keys(mdl).forEach(function (k) { if (mdl[k]) list.push(['ml' + k + (mdl[k].ts || 0), mdl[k]]); });
+    Object.keys(mdn).forEach(function (k) { if (mdn[k]) list.push(['md' + k + (mdn[k].ts || 0), mdn[k]]); });
     list.sort(function (a, b) { return ((a[1] && a[1].ts) || 0) - ((b[1] && b[1].ts) || 0); });
     list.forEach(function (x) { fbEntry(x[0], x[1], false); });
     historyDone();
@@ -2099,6 +2391,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (k !== me) fbEntry('l' + k + (data.q || data.ts), data, true);
     } else if (p[0] === 'msgs' && data && p.length === 2) fbEntry('m' + k, data, true);
     else if (p[0] === 'notes' && data && p.length === 2) fbEntry('n' + k, data, true);
+    else if (p[0] === 'mood' && data && p.length === 2) fbEntry('md' + k + (data.ts || ''), data, true);
+    else if (p[0] === 'moodlist' && data && p.length === 2) fbEntry('ml' + k + (data.ts || ''), data, true);
   }
   function fallbackToNtfy() {
     if (!useFb) return;
@@ -2255,6 +2549,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     } else {
       wake();
       // back after a while: catch up on what you missed
+      maybeGoodMorning();
       if (Date.now() - lastSeenAt > 20000) startSession();
       else if (connected) send({ t: 'hi' });
     }
@@ -2266,6 +2561,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var taps = [];
   var konami = [];
   var KONAMI = ['top', 'top', 'bottom', 'bottom', 'left', 'right', 'left', 'right'];
+  var MATRIX_SEQ = ['bottom', 'bottom', 'top', 'top'];
   var seq = { tip: 0, left: 0, right: 0 };
   var lastPetAt = -1e9;
 
@@ -2381,6 +2677,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
         else if (i && konami[i].t - konami[i - 1].t > 1600) ok = false;
       }
       if (ok) { konami.length = 0; doFx('pixel', {}); }
+      else {
+        var L = konami.length, mx = L >= 4;
+        for (var mi = 0; mx && mi < 4; mi++) {
+          var kk = konami[L - 4 + mi];
+          if (kk.z !== MATRIX_SEQ[mi] || (mi && kk.t - konami[L - 5 + mi].t > 1600)) mx = false;
+        }
+        if (mx) { konami.length = 0; doFx('matrix', {}); }
+      }
     }
     kissSequence(u, v, now);
   }
@@ -2402,7 +2706,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var now = performance.now();
     var u = (e.clientX - cx) / S, v = (e.clientY - cy) / S;
     var id = e.pointerId == null ? 0 : e.pointerId;
-    ptrs[id] = { id: id, t0: now, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, u0: u, v0: v, len: 0, mv: 0, done: false, pair: false, timers: [] };
+    ptrs[id] = { id: id, t0: now, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, u0: u, v0: v, len: 0, mv: 0, done: false, pair: false, timers: [], ang: null, sweep: 0, n: 0, inN: 0 };
     pressed = true;
     mineDown = true;
     lastSend = now;
@@ -2422,6 +2726,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       p.len += Math.sqrt(dx * dx + dy * dy);
       p.x = e.clientX; p.y = e.clientY;
       p.mv = Math.max(p.mv, Math.sqrt(Math.pow(e.clientX - p.x0, 2) + Math.pow(e.clientY - p.y0, 2)) / S);
+      var ang = Math.atan2(e.clientY - cy, e.clientX - cx);
+      if (p.ang != null) { var da = ang - p.ang; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; p.sweep += da; }
+      p.ang = ang; p.n++;
+      if (inHeart((e.clientX - cx) / S, (e.clientY - cy) / S)) p.inN++;
       // slow petting stroke on the heart
       var dur = now - p.t0;
       if (!p.done && !p.pair && !isDip(p.u0, p.v0) && dur > 1100 && p.len > 5 * S && p.len / (dur / 1000) < 170 && now - lastPetAt > 6000 &&
@@ -2438,6 +2746,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   });
   function strokeEnd(p, now) {
     var dur = now - p.t0;
+    // a full circle drawn around the heart (outside it): Tardis
+    if (!p.done && !p.pair && Math.abs(p.sweep) > 5.6 && dur < 4000 && p.n > 6 && p.inN <= p.n * 0.2 && !inHeart(p.u0, p.v0)) {
+      p.done = true; doFx('tardis', {}); return;
+    }
     // unzip: one smooth drag from the dip down to the bottom tip
     var ue = (p.x - cx) / S, ve = (p.y - cy) / S;
     if (!p.done && !p.pair && isDip(p.u0, p.v0) && ve > 7 && Math.abs(ue) < 6 && dur > 150 && dur < 2500 &&
