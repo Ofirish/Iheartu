@@ -121,6 +121,8 @@ body {
 #moodPanel .sw button.on { border-color: #fff; }
 #moodPanel .addbox[hidden] { display: none; }
 /* love jar */
+#jarPanel .jartitle { font-family: var(--font-display); font-style: italic; font-size: 1.7rem; margin: 0 0 4px; }
+#jarPanel .jarcount { font-size: .85rem; opacity: .7; }
 .jarbox::before { content: "🫙"; display: block; font-size: 2.6rem; font-style: normal; margin-bottom: 6px; animation: jarTip 1s ease-out; }
 @keyframes jarTip { 0% { transform: rotate(0) translateY(0); } 40% { transform: rotate(-150deg) translateY(-8px); } 100% { transform: rotate(0) translateY(0); } }
 /* body map */
@@ -295,9 +297,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 </div>
 <div class="gold" id="gold"></div>
 <div class="panel" id="compose" hidden>
-  <p>Write something for them. Hide it as a note they find next time, or drop it in our love jar.</p>
+  <p>Hide a note for them. They see it the next time they open the heart.</p>
   <input id="composeInput" type="text" maxlength="140" autocomplete="off" aria-label="Note">
-  <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeJar">🫙 Add to our jar</button><button type="button" id="composeCancel">Cancel</button></div>
+  <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeCancel">Cancel</button></div>
 </div>
 <div class="panel notebox" id="notebox" hidden></div>
 <div class="panel" id="ach" hidden>
@@ -317,6 +319,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <div class="row"><button type="button" id="askYes">😈 Yes</button><button type="button" id="askLater">😇 Maybe later</button></div>
 </div>
 <div class="panel notebox jarbox" id="jarBox" hidden></div>
+<div class="panel" id="jarPanel" hidden>
+  <p class="jartitle">🫙 Our love jar</p>
+  <p class="jarcount" id="jarCount"></p>
+  <input id="jarInput" type="text" maxlength="140" autocomplete="off" aria-label="A reason you love them" placeholder="A reason I love you…">
+  <div class="row"><button type="button" id="jarAdd">Drop it in</button><button type="button" id="jarPull">Pull one out</button><button type="button" id="jarClose">Close</button></div>
+</div>
 <div class="bodyview" id="bodyView" hidden>
   <p class="bvtop" id="bvTop">Tap where you want them</p>
   <svg id="bvSvg" viewBox="0 0 100 200" aria-hidden="true">
@@ -1437,17 +1445,28 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     jarStore[m.jid] = { n: m.n.slice(0, 140), dv: String(m.dv || ''), at: tms };
     lsSet(K('jar'), JSON.stringify(jarStore));
   }
-  document.getElementById('composeJar').addEventListener('click', function () {
-    var t = composeInput.value.trim().slice(0, 140);
-    composeEl.hidden = true;
-    if (!t) return;
+  // the jar opens with its own gesture: flip the phone face down and back up, then hold the tip within 4 s
+  var jarPanel = document.getElementById('jarPanel'), jarInput = document.getElementById('jarInput');
+  function openJar() {
+    var all = Object.keys(jarStore), theirs = all.filter(function (k) { return jarStore[k].dv !== did; }).length;
+    document.getElementById('jarCount').textContent = theirs + (theirs === 1 ? ' reason' : ' reasons') + ' from them inside, ' + (all.length - theirs) + ' from you';
+    jarInput.value = '';
+    jarPanel.hidden = false;
+    vib([30, 40, 30]);
+  }
+  document.getElementById('jarAdd').addEventListener('click', function () {
+    var t = jarInput.value.trim().slice(0, 140);
+    if (!t) { try { jarInput.focus(); } catch (e) {} return; }
+    jarPanel.hidden = true;
     var jid = Math.random().toString(36).slice(2, 10);
     adoptJar({ jid: jid, n: t, dv: did }, true, Date.now());
     sendReliable({ t: 'jar', jid: jid, n: t }, function (okSent) {
       if (okSent) showToast('Dropped in our love jar 🫙', 4000);
-      else { showMsg("Couldn't add it to the jar. Try again."); composeInput.value = t; composeEl.hidden = false; }
+      else { showMsg("Couldn't add it to the jar. Try again."); openJar(); jarInput.value = t; }
     });
   });
+  document.getElementById('jarPull').addEventListener('click', function () { jarPanel.hidden = true; pullJar(); });
+  document.getElementById('jarClose').addEventListener('click', function () { jarPanel.hidden = true; });
   var jarBox = document.getElementById('jarBox');
   function pullJar() {
     var theirs = Object.keys(jarStore).filter(function (k) { return jarStore[k].dv !== did; });
@@ -1466,7 +1485,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   jarBox.addEventListener('click', function () { jarBox.hidden = true; });
   // flip: the screen turns to face the floor for a moment, then back up (works whichever way the phone reports it)
-  var flipSign = 0, flipDownAt = 0, flipDownSince = 0, lastFlipAt = -1e9;
+  var flipSign = 0, flipDownAt = 0, flipDownSince = 0, flipUpAt = -1e9;
   window.addEventListener('devicemotion', function (e) {
     var g = e.accelerationIncludingGravity;
     if (!g || g.z == null || document.visibilityState !== 'visible') return;
@@ -1477,7 +1496,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (!flipDownSince) flipDownSince = now;
       if (now - flipDownSince > 350) flipDownAt = now;
     } else {
-      if (flipDownAt && now - flipDownAt < 4000 && now - lastFlipAt > 3000 && jarBox.hidden) { lastFlipAt = now; pullJar(); }
+      if (flipDownAt && now - flipDownAt < 4000) { flipUpAt = now; vib(20); }   // the jar is ready: hold the tip within 4 s
       flipDownAt = 0; flipDownSince = 0;
     }
   });
@@ -2806,7 +2825,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     // long presses: bottom tip = hide a note, the dip at the top = binary heart (the middle is left free for holding hands)
     if (v > 9 && Math.abs(u) < 5) {
-      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; openCompose(); } }, 1500));
+      // a hold that starts within 4 s of turning the phone back face up opens the love jar instead of the note box
+      var forJar = now - flipUpAt <= 4000;
+      p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; if (forJar) openJar(); else openCompose(); } }, 1500));
     } else if (isDip(u, v)) {
       p.timers.push(setTimeout(function () { if (ptrs[p.id] === p && !p.done && p.mv < 1.5) { p.done = true; doFx('binary', {}); } }, 1500));
     } else if (inHeart(u, v) && v < -3 && Math.abs(u) > 4) {
@@ -2998,7 +3019,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Pull from the jar'], ['body', 'Body map'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Love jar'], ['body', 'Body map'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -3029,7 +3050,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'rizz') runFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) }, false);
     else if (a === 'good') runFx('good', {}, true);
     else if (a === 'note') openCompose();
-    else if (a === 'jar') pullJar();
+    else if (a === 'jar') openJar();
     else if (a === 'body') openBodyPick();
     else if (a === 'ach') openAch();
     else if (a === 'clearach') {
