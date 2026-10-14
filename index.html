@@ -120,6 +120,23 @@ body {
 #moodPanel .sw button { width: 26px; height: 26px; padding: 0; border-radius: 50%; background: var(--mc); border: 2px solid transparent; }
 #moodPanel .sw button.on { border-color: #fff; }
 #moodPanel .addbox[hidden] { display: none; }
+/* love jar */
+.jarbox::before { content: "🫙"; display: block; font-size: 2.6rem; font-style: normal; margin-bottom: 6px; animation: jarTip 1s ease-out; }
+@keyframes jarTip { 0% { transform: rotate(0) translateY(0); } 40% { transform: rotate(-150deg) translateY(-8px); } 100% { transform: rotate(0) translateY(0); } }
+/* body map */
+.bodyview { position: fixed; inset: 0; z-index: 44; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; background: radial-gradient(circle at 50% 45%, rgb(80,10,46), rgb(12,2,9)); color: #ffe9f7; font-family: var(--font-ui); text-align: center; }
+.bodyview[hidden] { display: none; }
+.bodyview .bvtop { margin: 0; font-family: var(--font-display); font-style: italic; font-size: 1.6rem; text-shadow: 0 0 14px rgba(255,79,163,.9); text-wrap: balance; }
+.bodyview svg { height: min(58vh, 520px); width: auto; max-width: 80vw; touch-action: none; }
+.bodyview .fig circle, .bodyview .fig path { fill: rgba(255,79,163,.10); stroke: rgba(255,170,215,.95); stroke-width: 1.1; stroke-linejoin: round; stroke-linecap: round; }
+.bodyview .fig .soft { fill: none; stroke: rgba(255,170,215,.55); stroke-width: .8; }
+.bodyview .mark .dot { fill: #fff; }
+.bodyview .mark .ring { fill: rgba(255,60,120,.35); stroke: #ff4fa3; stroke-width: 1; transform-box: fill-box; transform-origin: center; animation: bvPulse 1.2s ease-in-out infinite; }
+.bodyview .mark[hidden] { display: none; }
+@keyframes bvPulse { 0%, 100% { transform: scale(.7); opacity: 1; } 50% { transform: scale(1.35); opacity: .45; } }
+.bodyview .bvrow { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.bodyview .bvrow[hidden] { display: none; }
+.bodyview button { padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,130,190,.6); background: rgba(255,79,163,.18); color: #ffe9f7; font: inherit; font-size: 1rem; }
 #joinPanel .err { color: #ff9ab8; font-size: .85rem; margin: 8px 0 0; }
 #joinPanel .err[hidden] { display: none; }
 .mail::after { content: ""; position: absolute; inset: -8px; }
@@ -278,9 +295,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 </div>
 <div class="gold" id="gold"></div>
 <div class="panel" id="compose" hidden>
-  <p>Hide a note for them. They see it the next time they open the heart.</p>
+  <p>Write something for them. Hide it as a note they find next time, or drop it in our love jar.</p>
   <input id="composeInput" type="text" maxlength="140" autocomplete="off" aria-label="Note">
-  <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeCancel">Cancel</button></div>
+  <div class="row"><button type="button" id="composeSend">Hide note</button><button type="button" id="composeJar">🫙 Add to our jar</button><button type="button" id="composeCancel">Cancel</button></div>
 </div>
 <div class="panel notebox" id="notebox" hidden></div>
 <div class="panel" id="ach" hidden>
@@ -298,6 +315,22 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 <div class="panel" id="askPanel" hidden>
   <p class="q">🔥 Tonight?</p>
   <div class="row"><button type="button" id="askYes">😈 Yes</button><button type="button" id="askLater">😇 Maybe later</button></div>
+</div>
+<div class="panel notebox jarbox" id="jarBox" hidden></div>
+<div class="bodyview" id="bodyView" hidden>
+  <p class="bvtop" id="bvTop">Tap where you want them</p>
+  <svg id="bvSvg" viewBox="0 0 100 200" aria-hidden="true">
+    <defs><filter id="bvGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <g class="fig" filter="url(#bvGlow)">
+      <circle cx="50" cy="16" r="11"/>
+      <path d="M44 27 C44 35 39 38 29 41 C20 44 17 54 21 66 C25 79 29 91 31 103 C32 112 26 123 24 136 C22 150 27 168 33 190 L47 190 L50 158 L53 190 L67 190 C73 168 78 150 76 136 C74 123 68 112 69 103 C71 91 75 79 79 66 C83 54 80 44 71 41 C61 38 56 35 56 27"/>
+      <path class="soft" d="M33 63 Q41 74 49 66 M51 66 Q59 74 67 63 M50 158 L50 150"/>
+      <circle class="soft" cx="50" cy="104" r="0.9"/>
+    </g>
+    <g id="bvMark" class="mark" hidden><circle class="ring" r="7"/><circle class="dot" r="2.6"/></g>
+  </svg>
+  <div class="bvrow" id="bvChoose" hidden><button type="button" data-a="kiss">💋 Kiss</button><button type="button" data-a="touch">✋ Touch</button><button type="button" data-a="bite">😈 Bite</button></div>
+  <div class="bvrow"><button type="button" id="bvClose">Cancel</button></div>
 </div>
 <div class="panel" id="moodPanel" hidden>
   <p>How do you feel?</p>
@@ -1149,6 +1182,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var item = noteQueue.shift();
     if (item.kind === 'fog') { openFog(item); return; }
     if (item.kind === 'ask') { openAsk(item); return; }
+    if (item.kind === 'spot') { openSpot(item, false); return; }
     noteBox.textContent = '💌 ' + item.n;
     noteBox.hidden = false;
     buzz([60, 60, 60], true);
@@ -1393,6 +1427,121 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var statusHold = 0, statusHeld = false;
   statusEl.addEventListener('pointerdown', function () { statusHeld = false; clearTimeout(statusHold); statusHold = setTimeout(function () { statusHeld = true; openMood(); }, 700); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { statusEl.addEventListener(ev, function () { clearTimeout(statusHold); }); });
+
+  // ---- Love jar: reasons you love each other; flip the phone face down and back to pull one out ----
+  var jarStore = {};
+  function loadJar() { jarStore = jsonGet('jar', {}) || {}; }
+  function adoptJar(m, mineDev, tms) {
+    if (typeof m.jid !== 'string' || !/^[a-z0-9]{1,16}$/.test(m.jid) || typeof m.n !== 'string' || !m.n.trim()) return;
+    if (jarStore[m.jid]) return;
+    jarStore[m.jid] = { n: m.n.slice(0, 140), dv: String(m.dv || ''), at: tms };
+    lsSet(K('jar'), JSON.stringify(jarStore));
+  }
+  document.getElementById('composeJar').addEventListener('click', function () {
+    var t = composeInput.value.trim().slice(0, 140);
+    composeEl.hidden = true;
+    if (!t) return;
+    var jid = Math.random().toString(36).slice(2, 10);
+    adoptJar({ jid: jid, n: t, dv: did }, true, Date.now());
+    sendReliable({ t: 'jar', jid: jid, n: t }, function (okSent) {
+      if (okSent) showToast('Dropped in our love jar 🫙', 4000);
+      else { showMsg("Couldn't add it to the jar. Try again."); composeInput.value = t; composeEl.hidden = false; }
+    });
+  });
+  var jarBox = document.getElementById('jarBox');
+  function pullJar() {
+    var theirs = Object.keys(jarStore).filter(function (k) { return jarStore[k].dv !== did; });
+    if (!theirs.length) { showMsg('🫙 The jar is empty. Ask them to drop in a reason they love you.'); return; }
+    var seenJ = (lsGet(K('jarseen')) || '').split(',').filter(Boolean);
+    var fresh = theirs.filter(function (k) { return seenJ.indexOf(k) < 0; });
+    if (!fresh.length) { seenJ = []; fresh = theirs; }
+    var pick = fresh[Math.floor(Math.random() * fresh.length)];
+    seenJ.push(pick);
+    lsSet(K('jarseen'), seenJ.slice(-200).join(','));
+    jarBox.textContent = jarStore[pick].n;
+    jarBox.hidden = false;
+    logMsg('jar', '🫙 ' + jarStore[pick].n);
+    vib([40, 60, 40]);
+    sfx('note');
+  }
+  jarBox.addEventListener('click', function () { jarBox.hidden = true; });
+  // flip: the screen turns to face the floor for a moment, then back up (works whichever way the phone reports it)
+  var flipSign = 0, flipDownAt = 0, flipDownSince = 0, lastFlipAt = -1e9;
+  window.addEventListener('devicemotion', function (e) {
+    var g = e.accelerationIncludingGravity;
+    if (!g || g.z == null || document.visibilityState !== 'visible') return;
+    var z = g.z, now = performance.now(), sg = z > 7 ? 1 : z < -7 ? -1 : 0;
+    if (!sg) return;
+    if (!flipSign) { flipSign = sg; return; }
+    if (sg !== flipSign) {   // upside down
+      if (!flipDownSince) flipDownSince = now;
+      if (now - flipDownSince > 350) flipDownAt = now;
+    } else {
+      if (flipDownAt && now - flipDownAt < 4000 && now - lastFlipAt > 3000 && jarBox.hidden) { lastFlipAt = now; pullJar(); }
+      flipDownAt = 0; flipDownSince = 0;
+    }
+  });
+
+  // ---- Body map: drag from the bottom tip up to the dip, tap a spot, choose kiss, touch or bite ----
+  var SPOT_TXT = { kiss: 'I want to kiss you… here 💋', touch: 'I want to touch you… here ✋', bite: 'I want to bite you… here 😈' };
+  function clampN(n, a, b) { n = Number(n); return isFinite(n) ? Math.max(a, Math.min(b, n)) : a; }
+  var bodyView = document.getElementById('bodyView'), bvSvg = document.getElementById('bvSvg'), bvMark = document.getElementById('bvMark');
+  var bvMode = '', bvPick = null, bvItem = null;
+  function placeMark(x, y) { bvMark.setAttribute('transform', 'translate(' + x + ' ' + y + ')'); bvMark.hidden = false; bvMark.removeAttribute('hidden'); }
+  function openBodyPick() {
+    bvMode = 'pick'; bvPick = null; bvItem = null;
+    document.getElementById('bvTop').textContent = 'Tap where you want them';
+    bvMark.setAttribute('hidden', ''); document.getElementById('bvChoose').hidden = true;
+    document.getElementById('bvClose').textContent = 'Cancel';
+    bodyView.hidden = false;
+  }
+  function openSpot(item, replay) {
+    bvMode = 'view'; bvItem = replay ? null : item;
+    document.getElementById('bvTop').textContent = SPOT_TXT[item.a] || SPOT_TXT.kiss;
+    placeMark(item.x, item.y);
+    document.getElementById('bvChoose').hidden = true;
+    document.getElementById('bvClose').textContent = 'Close';
+    bodyView.hidden = false;
+    if (!replay) {
+      logMsg('spot', SPOT_TXT[item.a], item.at || Date.now(), { sx: item.x, sy: item.y, sa: item.a });
+      buzz([90, 70, 90, 70, 200], true);
+      sfx('love');
+      doneSecret(item, { k: 'spot' });
+    }
+  }
+  bvSvg.addEventListener('pointerdown', function (e) {
+    if (bvMode !== 'pick') return;
+    var r = bvSvg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 200;
+    if (x < 0 || x > 100 || y < 0 || y > 200) return;
+    bvPick = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+    placeMark(bvPick.x, bvPick.y);
+    document.getElementById('bvTop').textContent = 'Here? Choose what you want to do';
+    document.getElementById('bvChoose').hidden = false;
+    vib(20);
+  });
+  [].forEach.call(document.querySelectorAll('#bvChoose button'), function (b) {
+    b.addEventListener('click', function () {
+      if (!bvPick) return;
+      var a = b.getAttribute('data-a'), nid = Math.random().toString(36).slice(2, 10), pk = bvPick;
+      bodyView.hidden = true; bvMode = '';
+      sendReliable({ t: 'spot', nid: nid, x: pk.x, y: pk.y, a: a }, function (okSent) {
+        if (okSent) {
+          var out = loadOut(); out[nid] = 0; saveOut(out);
+          showToast('Sent: ' + SPOT_TXT[a], 5000);
+          logMsg('spot', 'You sent: ' + SPOT_TXT[a], Date.now(), { sx: pk.x, sy: pk.y, sa: a });
+        } else showMsg("Couldn't send it. Check your connection and try again.");
+      });
+    });
+  });
+  function closeBody() {
+    var wasView = bvMode === 'view';
+    bodyView.hidden = true; bvMode = ''; bvItem = null;
+    if (wasView) { noteShowing = false; showNextNote(); }
+  }
+  document.getElementById('bvClose').addEventListener('click', closeBody);
+  bodyView.addEventListener('click', function (e) { if (bvMode === 'view' && e.target === bodyView) closeBody(); });
 
   // ---- Good morning: the first time each phone opens the heart between 07:00 and 12:00 ----
   function maybeGoodMorning() {
@@ -1958,6 +2107,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     try { ach = JSON.parse(lsGet(K('ach')) || '{}') || {}; } catch (e) { ach = {}; }
     loadMoods();
     renderMood();
+    loadJar();
   }
   initPersisted();
 
@@ -1981,9 +2131,11 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var inboxList = document.getElementById('inboxList');
   function loadInbox() { try { var a = JSON.parse(lsGet(K('inbox')) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   function markMail() { if (mailBtn) mailBtn.classList.toggle('unread', Number(lsGet(K('inboxnew')) || 0) > 0); }
-  function logMsg(kind, txt, when) {
+  function logMsg(kind, txt, when, extra) {
     var a = loadInbox();
-    a.push({ t: when || Date.now(), k: kind, x: String(txt).slice(0, 200) });
+    var en = { t: when || Date.now(), k: kind, x: String(txt).slice(0, 200) };
+    if (extra) for (var ek in extra) en[ek] = extra[ek];
+    a.push(en);
     a.sort(function (p, q) { return p.t - q.t; });
     lsSet(K('inbox'), JSON.stringify(a.slice(-60)));
     if (!inboxEl || inboxEl.hidden) lsSet(K('inboxnew'), 1);
@@ -2009,6 +2161,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
         li.className = 'note';
         li.textContent = '\uD83D\uDC8C ' + m.x;
         li.addEventListener('click', function () { inboxEl.hidden = true; noteQueue.unshift({ kind: 'note', n: m.x, nid: '' }); showNextNote(); });
+      } else if (m.k === 'spot' && typeof m.sx === 'number') {
+        li.className = 'note';
+        li.textContent = m.x;
+        li.addEventListener('click', function () { inboxEl.hidden = true; openSpot({ x: m.sx, y: m.sy, a: m.sa, nid: '' }, true); });
       } else li.textContent = m.x;
       var sm = document.createElement('small');
       sm.textContent = (m.k === 'note' ? 'Hidden note \u00B7 ' : '') + fmtWhen(m.t);
@@ -2158,7 +2314,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var js = JSON.stringify(obj);
     if (!useFb) return fetch(RELAY + '/' + topic + (obj.t === 'hi' ? '?cache=no' : ''), { method: 'POST', body: js });
     var e = { m: js, ts: { '.sv': 'timestamp' } };
-    if ((obj.t === 'note' || obj.t === 'fog' || obj.t === 'ask') && /^[a-z0-9]{1,16}$/.test(obj.nid || '')) return fbReq('PUT', '/notes/' + obj.nid, e);
+    if ((obj.t === 'note' || obj.t === 'fog' || obj.t === 'ask' || obj.t === 'spot') && /^[a-z0-9]{1,16}$/.test(obj.nid || '')) return fbReq('PUT', '/notes/' + obj.nid, e);
+    if (obj.t === 'jar' && /^[a-z0-9]{1,16}$/.test(obj.jid || '')) return fbReq('PUT', '/jar/' + obj.jid, e);
     if (obj.t === 'anniv') return fbReq('PUT', '/anniv', e);
     if (obj.t === 'mood') return fbReq('PUT', '/mood/' + safeKey(did), e);
     if (obj.t === 'moodadd' && /^[a-z0-9]{1,16}$/.test(obj.mid || '')) return fbReq('PUT', '/moodlist/' + obj.mid, e);
@@ -2237,10 +2394,15 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     if (m.t === 'noteread' && !mineDev && typeof m.nid === 'string') {
       var outN = loadOut();
-      var rtxt = m.k === 'fog' ? '😏 They wiped the fog and found: “' + FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length] + '”' : '💌 Your note was read';
+      var rtxt = m.k === 'fog' ? '😏 They wiped the fog and found: “' + FOG_MSGS[Math.abs(m.i | 0) % FOG_MSGS.length] + '”' : m.k === 'spot' ? '😏 They saw where you want them' : '💌 Your note was read';
       if (outN[m.nid] === 0) { outN[m.nid] = 1; saveOut(outN); showMsg(rtxt); logMsg('read', rtxt); }
     }
     if (m.t === 'mood' && typeof m.at === 'number') adoptMood(m, mineDev, live);
+    if (m.t === 'jar') adoptJar(m, mineDev, tms);
+    if (m.t === 'spot' && !mineDev && typeof m.nid === 'string' && /^[a-z0-9]{1,16}$/.test(m.nid) && SPOT_TXT[m.a] && !noteSeenBefore(d.id)) {
+      noteQueue.push({ kind: 'spot', x: clampN(m.x, 0, 100), y: clampN(m.y, 0, 200), a: m.a, nid: m.nid, at: tms });
+      if (live) showNextNote();
+    }
     if (m.t === 'moodadd') adoptMoodAdd(m);
     if (m.t === 'aggr' && !mineDev && !noteSeenBefore(d.id)) {
       showMsg('💥 You are aggressively loved');
@@ -2353,7 +2515,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     Object.keys(msgs).forEach(function (k) { list.push(['m' + k, msgs[k]]); });
     Object.keys(notes).forEach(function (k) { list.push(['n' + k, notes[k]]); });
     if (data.anniv) list.push(['a' + (data.anniv.ts || 0), data.anniv]);
-    var mdl = data.moodlist || {}, mdn = data.mood || {};
+    var mdl = data.moodlist || {}, mdn = data.mood || {}, jr = data.jar || {};
+    Object.keys(jr).forEach(function (k) { if (jr[k]) list.push(['j' + k, jr[k]]); });
     Object.keys(mdl).forEach(function (k) { if (mdl[k]) list.push(['ml' + k + (mdl[k].ts || 0), mdl[k]]); });
     Object.keys(mdn).forEach(function (k) { if (mdn[k]) list.push(['md' + k + (mdn[k].ts || 0), mdn[k]]); });
     list.sort(function (a, b) { return ((a[1] && a[1].ts) || 0) - ((b[1] && b[1].ts) || 0); });
@@ -2393,6 +2556,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (p[0] === 'notes' && data && p.length === 2) fbEntry('n' + k, data, true);
     else if (p[0] === 'mood' && data && p.length === 2) fbEntry('md' + k + (data.ts || ''), data, true);
     else if (p[0] === 'moodlist' && data && p.length === 2) fbEntry('ml' + k + (data.ts || ''), data, true);
+    else if (p[0] === 'jar' && data && p.length === 2) fbEntry('j' + k, data, true);
   }
   function fallbackToNtfy() {
     if (!useFb) return;
@@ -2732,7 +2896,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (inHeart((e.clientX - cx) / S, (e.clientY - cy) / S)) p.inN++;
       // slow petting stroke on the heart
       var dur = now - p.t0;
-      if (!p.done && !p.pair && !isDip(p.u0, p.v0) && dur > 1100 && p.len > 5 * S && p.len / (dur / 1000) < 170 && now - lastPetAt > 6000 &&
+      if (!p.done && !p.pair && !isDip(p.u0, p.v0) && !(p.v0 > 8.5 && Math.abs(p.u0) < 5) && dur > 1100 && p.len > 5 * S && p.len / (dur / 1000) < 170 && now - lastPetAt > 6000 &&
           inHeart((e.clientX - cx) / S, (e.clientY - cy) / S)) {
         p.done = true;
         lastPetAt = now;
@@ -2752,6 +2916,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
     // unzip: one smooth drag from the dip down to the bottom tip
     var ue = (p.x - cx) / S, ve = (p.y - cy) / S;
+    // body map: one drag from the bottom tip up to the dip
+    if (!p.done && !p.pair && p.v0 > 8.5 && Math.abs(p.u0) < 5 && ve < -3 && Math.abs(ue) < 5 && dur > 150 && dur < 2500 &&
+        Math.abs(p.x - p.x0) < (p.y0 - p.y) * 0.6) { p.done = true; openBodyPick(); return; }
     if (!p.done && !p.pair && isDip(p.u0, p.v0) && ve > 7 && Math.abs(ue) < 6 && dur > 150 && dur < 2500 &&
         Math.abs(p.x - p.x0) < (p.y - p.y0) * 0.6) { p.done = true; doFx('tease', {}); return; }
     if (p.done || p.pair || dur > 450 || p.len < Math.min(W, H) * 0.32) return;
@@ -2831,7 +2998,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Pull from the jar'], ['body', 'Body map'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -2862,6 +3029,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'rizz') runFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) }, false);
     else if (a === 'good') runFx('good', {}, true);
     else if (a === 'note') openCompose();
+    else if (a === 'jar') pullJar();
+    else if (a === 'body') openBodyPick();
     else if (a === 'ach') openAch();
     else if (a === 'clearach') {
       sentCount = 0; ach = {}; daysMe = {}; daysThem = {};
