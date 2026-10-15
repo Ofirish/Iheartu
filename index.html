@@ -984,6 +984,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function doFx(k, d) {
     d = d || {};
     runFx(k, d, false);
+    try { funAfterFx(k); } catch (e) {}
     if (k === 'kiss') { send({ t: 'kiss', k: 'dbl', u: r2(d.u), v: r2(d.v) }); return; }
     var o = { t: 'fx', k: k };
     if (d.u != null) o.u = r2(d.u);
@@ -1088,6 +1089,121 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       }
     }
   }
+  // ---- Fun achievements: hidden until unlocked, each phone earns its own ----
+  var FUN = [
+    ['nightowl', '🦉', 'Night Owl', 'Thinking of her even in your dreams.'],
+    ['buttdial', '🤳', 'Butt Dial', "That wasn't your finger, was it?"],
+    ['jackpot', '🎰', 'Jackpot', 'She really, really means that one.'],
+    ['lightning', '⏱️', 'Lightning Lover', 'Reflexes of a horny cat.'],
+    ['dizzy', '🌀', 'Dizzy in Love', 'Bigger on the inside, spinning on the outside.'],
+    ['siamese', '🫂', 'Siamese Twins', 'Two hands, one heart.'],
+    ['earlybird', '🐦', 'Early Bird', 'First thought of the day: her.'],
+    ['poet', '📜', 'Poet', "Shakespeare called. He's jealous."],
+    ['memory', '🕵️', 'Memory Keeper', 'Every word, treasured.'],
+    ['bullseye', '🎯', 'Bullseye', 'Straight to the heart.'],
+    ['mindreader', '💞', 'Mind Reader', 'Same heart, same feeling.'],
+    ['aggrchamp', '🫀', 'Love Aggression Champion', 'Loved to the max.'],
+    ['insatiable', '😈', 'Insatiable', 'Hungry for love.'],
+    ['grabby', '🍑', 'Grabby Hands', 'Hands full of happiness.'],
+    ['vampire', '🧛', 'Vampire', 'A little bite never hurt.'],
+    ['explorer', '🗺️', 'Explorer', 'Thorough. We like thorough.'],
+    ['favspot', '🎯', 'Favourite Spot', "We all know where you're going."],
+    ['weatherman', '🌫️', 'Steamy Weatherman', 'Forecast: 100% chance of moisture.'],
+    ['bootycall', '🔥', 'Booty Call Champion', 'Undefeated.'],
+    ['teasemaster', '🎀', 'Tease Master', 'Worth the wait.'],
+    ['yesdaddy', '🍆', 'Yes, Daddy', 'Daddy ♥ Toy forever.'],
+    ['overheated', '💦', 'Overheated', 'Somebody open a window.'],
+    ['completionist', '🏆', 'Completionist', 'You found everything. Even the dirty ones.']
+  ];
+  // every secret gesture, for the Completionist
+  var GESTURES = ['kiss', 'kissrain', 'luvrain', 'luvtoo', 'patronus', 'saber', 'iluToo', 'pixel', 'binary', 'warp', 'fh', 'confetti', 'rizz', 'good',
+    'want', 'tease', 'tardis', 'matrix', 'fog', 'ask', 'note', 'jar', 'body', 'mood', 'aggr'];
+  function funGot() { try { return JSON.parse(lsGet(K('fun')) || '{}') || {}; } catch (e) { return {}; } }
+  function funCounts() { try { return JSON.parse(lsGet(K('funn')) || '{}') || {}; } catch (e) { return {}; } }
+  function unlockFun(id) {
+    var got = funGot();
+    if (got[id]) return false;
+    var f = null;
+    for (var i = 0; i < FUN.length; i++) if (FUN[i][0] === id) f = FUN[i];
+    if (!f) return false;
+    got[id] = Date.now();
+    lsSet(K('fun'), JSON.stringify(got));
+    showMsg(f[1] + ' ' + f[2] + ' unlocked! ' + f[3]);
+    logMsg('ach', f[1] + ' ' + f[2] + ': ' + f[3]);
+    vib([40, 40, 40, 40, 160]);
+    return true;
+  }
+  // counters; keys ending in @ count per day and are forgotten the next day
+  function funBump(key, daily) {
+    var c = funCounts(), today = dayKey(Date.now()), k = daily ? key + '@' + today : key;
+    for (var x in c) if (x.indexOf('@') > 0 && x.slice(x.indexOf('@') + 1) !== today) delete c[x];
+    c[k] = (c[k] || 0) + 1;
+    lsSet(K('funn'), JSON.stringify(c));
+    return c[k];
+  }
+  function funSet(key, val) { var c = funCounts(); c[key] = val; lsSet(K('funn'), JSON.stringify(c)); }
+  function funGet(key) { return funCounts()[key]; }
+  function usedGesture(g) {
+    var c = funCounts(), u = c.used || {};
+    if (!u[g]) { u[g] = 1; c.used = u; lsSet(K('funn'), JSON.stringify(c)); }
+    var all = true;
+    for (var i = 0; i < GESTURES.length; i++) if (!u[GESTURES[i]]) { all = false; break; }
+    if (all) unlockFun('completionist');
+  }
+  var heatAt = {};   // Overheated: want, fog and Tonight? within 10 minutes
+  function heat(kind) {
+    heatAt[kind] = Date.now();
+    if (['want', 'fog', 'ask'].every(function (k) { return heatAt[k] && Date.now() - heatAt[k] < 600000; })) unlockFun('overheated');
+  }
+  function funAfterFx(k) {   // things you do yourself
+    usedGesture(k);
+    if (k === 'tardis' && funBump('tardis', true) >= 5) unlockFun('dizzy');
+    if (k === 'want') { heat('want'); if (funBump('want', true) >= 3) unlockFun('insatiable'); }
+    if (k === 'tease' && funBump('tease') >= 10) unlockFun('teasemaster');
+    if (k === 'matrix' && funBump('matrix') >= 7) unlockFun('yesdaddy');
+  }
+  var bullRun = 0, faceDownAt = -1e9, holdTogetherSince = 0;
+  function funPress(u, v, nowMs) {   // every press of your finger on the heart
+    if (new Date().getHours() === 3) unlockFun('nightowl');
+    if (performance.now() - faceDownAt < 800) unlockFun('buttdial');
+    if (Math.abs(u) < 1.4 && Math.abs(v - 0.5) < 1.4) { if (++bullRun >= 10) unlockFun('bullseye'); } else bullRun = 0;
+    // answering their touch within a second
+    for (var id in remote) { var rd = remote[id].downAt; if (rd && nowMs - rd < 1000 && nowMs - rd > 0) { unlockFun('lightning'); break; } }
+  }
+  setInterval(function () {   // Siamese Twins: holding together for a minute
+    var n = performance.now();
+    if (mineDown && remoteActive(n)) { if (!holdTogetherSince) holdTogetherSince = n; else if (n - holdTogetherSince >= 60000) unlockFun('siamese'); }
+    else holdTogetherSince = 0;
+  }, 1000);
+  function funSpot(x, y, a) {
+    if (a === 'touch' && funBump('touch') >= 10) unlockFun('grabby');
+    if (a === 'bite' && funBump('bite') >= 5) unlockFun('vampire');
+    var cell = Math.floor(x / 10) + ',' + Math.floor(y / 10), c = funCounts(), cells = c.cells || {};
+    cells[cell] = (cells[cell] || 0) + 1;
+    c.cells = cells;
+    lsSet(K('funn'), JSON.stringify(c));
+    if (Object.keys(cells).length >= 10) unlockFun('explorer');
+    if (cells[cell] >= 5) unlockFun('favspot');
+  }
+  // Early Bird: the first of you to open the heart in the morning, 7 mornings in a row
+  var partnerToday = '';
+  function funMorning() {
+    var now = new Date(), today = dayKey(now.getTime());
+    if (now.getHours() < 4 || funGet('ebday') === today) return;
+    var first = partnerToday !== today;
+    var y = new Date(now); y.setDate(now.getDate() - 1);
+    var run = first ? (funGet('ebrun') && funGet('ebday') === dayKey(y.getTime()) && funGet('ebfirst') ? funGet('ebrun') + 1 : 1) : 0;
+    var c = funCounts(); c.ebday = today; c.ebrun = run; c.ebfirst = first; lsSet(K('funn'), JSON.stringify(c));
+    if (run >= 7) unlockFun('earlybird');
+  }
+  function funInboxSeen(list) {
+    var c = funCounts(), seenT = c.seenT || [];
+    list.forEach(function (m) { if (seenT.indexOf(m.t) < 0) seenT.push(m.t); });
+    c.seenT = seenT.slice(-100);
+    lsSet(K('funn'), JSON.stringify(c));
+    if (seenT.length >= 50) unlockFun('memory');
+  }
+
   var achEl = document.getElementById('ach');
   var achList = document.getElementById('achList');
   function openAch() {
@@ -1106,6 +1222,16 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (!lsGet(K('flame' + n))) return;
       var li = document.createElement('li');
       li.textContent = '\uD83D\uDD25 ' + n + ' days in a row';
+      achList.appendChild(li);
+    });
+    var got = funGot();
+    FUN.forEach(function (f) {
+      if (!got[f[0]]) { locked++; return; }
+      var li = document.createElement('li');
+      li.textContent = f[1] + ' ' + f[2] + ' ';
+      var sm = document.createElement('small');
+      sm.textContent = f[3];
+      li.appendChild(sm);
       achList.appendChild(li);
     });
     if (locked) {
@@ -1206,6 +1332,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     "Hold me, I'm going to cum"
   ];
   function sendSecret(kind) {
+    usedGesture(kind); heat(kind);
+    if (kind === 'fog' && funBump('fog') >= 10) unlockFun('weatherman');
     var nid = Math.random().toString(36).slice(2, 10);
     var o = { t: kind, nid: nid };
     if (kind === 'fog') o.i = Math.floor(Math.random() * FOG_MSGS.length);
@@ -1353,6 +1481,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var sm = document.createElement('small'); sm.textContent = '· their mood'; moodChip.appendChild(sm);
     }
   }
+  function sameMood() {
+    if (myMood && myMood.mo && theirMood && theirMood.mo && myMood.mo.l === theirMood.mo.l && myMood.mo.e === theirMood.mo.e && Math.abs(myMood.at - theirMood.at) <= 300000) unlockFun('mindreader');
+  }
   function adoptMood(m, mineDev, live) {
     var mo = cleanMood(m.mo), at = m.at;
     if (mineDev) {   // my own mood, from this phone's other tab or an earlier visit
@@ -1363,6 +1494,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     theirMood = { mo: mo, at: at };
     lsSet(K('moodtheirs'), JSON.stringify(theirMood));
     renderMood();
+    sameMood();
     if (mo && live) { logMsg('mood', 'Their mood: ' + mo.e + ' ' + mo.l); vib([30, 50, 30]); }
   }
   function adoptMoodAdd(m) {
@@ -1403,11 +1535,12 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       sw.appendChild(b);
     });
   }
-  function openMood() { document.getElementById('moodAddBox').hidden = true; fillMoodPanel(); moodPanel.hidden = false; }
+  function openMood() { usedGesture('mood'); document.getElementById('moodAddBox').hidden = true; fillMoodPanel(); moodPanel.hidden = false; }
   function setMyMood(mo) {
     var at = Date.now();
     myMood = { mo: mo, at: at };
     lsSet(K('moodmine'), JSON.stringify(myMood));
+    sameMood();
     sendReliable({ t: 'mood', mo: mo, at: at });
     moodPanel.hidden = true;
     showToast(mo ? 'Your mood: ' + mo.e + ' ' + mo.l : 'Mood cleared', 3000);
@@ -1448,6 +1581,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   // the jar opens with its own gesture: flip the phone face down and back up, then hold the tip within 4 s
   var jarPanel = document.getElementById('jarPanel'), jarInput = document.getElementById('jarInput');
   function openJar() {
+    usedGesture('jar');
     var all = Object.keys(jarStore), theirs = all.filter(function (k) { return jarStore[k].dv !== did; }).length;
     document.getElementById('jarCount').textContent = theirs + (theirs === 1 ? ' reason' : ' reasons') + ' from them inside, ' + (all.length - theirs) + ' from you';
     jarInput.value = '';
@@ -1460,6 +1594,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     jarPanel.hidden = true;
     var jid = Math.random().toString(36).slice(2, 10);
     adoptJar({ jid: jid, n: t, dv: did }, true, Date.now());
+    if (funBump('poet') >= 10) unlockFun('poet');
     sendReliable({ t: 'jar', jid: jid, n: t }, function (okSent) {
       if (okSent) showToast('Dropped in our love jar 🫙', 4000);
       else { showMsg("Couldn't add it to the jar. Try again."); openJar(); jarInput.value = t; }
@@ -1475,6 +1610,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var fresh = theirs.filter(function (k) { return seenJ.indexOf(k) < 0; });
     if (!fresh.length) { seenJ = []; fresh = theirs; }
     var pick = fresh[Math.floor(Math.random() * fresh.length)];
+    var prev = lsGet(K('jarlast'));
+    if (prev && jarStore[prev] && theirs.indexOf(prev) >= 0 && Math.random() < 0.08) pick = prev;   // a lucky repeat
+    if (pick === prev) unlockFun('jackpot');
+    lsSet(K('jarlast'), pick);
     seenJ.push(pick);
     lsSet(K('jarseen'), seenJ.slice(-200).join(','));
     jarBox.textContent = jarStore[pick].n;
@@ -1490,6 +1629,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var g = e.accelerationIncludingGravity;
     if (!g || g.z == null || document.visibilityState !== 'visible') return;
     var z = g.z, now = performance.now(), sg = z > 7 ? 1 : z < -7 ? -1 : 0;
+    if (z < -7) faceDownAt = now;
     if (!sg) return;
     if (!flipSign) { flipSign = sg; return; }
     if (sg !== flipSign) {   // upside down
@@ -1508,6 +1648,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var bvMode = '', bvPick = null, bvItem = null;
   function placeMark(x, y) { bvMark.setAttribute('transform', 'translate(' + x + ' ' + y + ')'); bvMark.hidden = false; bvMark.removeAttribute('hidden'); }
   function openBodyPick() {
+    usedGesture('body');
     bvMode = 'pick'; bvPick = null; bvItem = null;
     document.getElementById('bvTop').textContent = 'Tap where you want them';
     bvMark.setAttribute('hidden', ''); document.getElementById('bvChoose').hidden = true;
@@ -1545,6 +1686,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (!bvPick) return;
       var a = b.getAttribute('data-a'), nid = Math.random().toString(36).slice(2, 10), pk = bvPick;
       bodyView.hidden = true; bvMode = '';
+      funSpot(pk.x, pk.y, a);
       sendReliable({ t: 'spot', nid: nid, x: pk.x, y: pk.y, a: a }, function (okSent) {
         if (okSent) {
           var out = loadOut(); out[nid] = 0; saveOut(out);
@@ -1577,6 +1719,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function openCompose() { composeInput.value = ''; composeEl.hidden = false; try { composeInput.focus(); } catch (e) {} }
   document.getElementById('composeCancel').addEventListener('click', function () { composeEl.hidden = true; });
   document.getElementById('composeSend').addEventListener('click', function () {
+    if (composeInput.value.trim()) usedGesture('note');
     var t = composeInput.value.trim().slice(0, 140);
     composeEl.hidden = true;
     if (!t) return;
@@ -2171,6 +2314,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function openInbox() {
     inboxList.textContent = '';
     var a = loadInbox().slice().reverse();
+    try { funInboxSeen(a); } catch (e) {}
     if (!a.length) {
       var e = document.createElement('li'); e.className = 'empty'; e.textContent = 'No messages yet'; inboxList.appendChild(e);
     }
@@ -2396,6 +2540,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (!m || typeof m.id !== 'string' || typeof m.t !== 'string') return;
     var tms = d.time ? d.time * 1000 : Date.now();
     var mineDev = m.dv === did;
+    if (!mineDev && m.t !== 'mood' && m.t !== 'moodadd' && m.t !== 'jar' && dayKey(tms) === dayKey(Date.now()) && new Date(tms).getHours() >= 4) partnerToday = dayKey(Date.now());
     if (!mineDev && !paired) { paired = true; lsSet(K('paired'), 1); }
     if (m.t === 'touch' && m.d === 1) { markDay(mineDev ? 'me' : 'them', tms); if (live && Date.now() - lastStreakCheck > 5000) { lastStreakCheck = Date.now(); checkStreak(); } }
     if (m.t === 'anniv') adoptAnniv(m.d, m.at);
@@ -2426,12 +2571,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (m.t === 'aggr' && !mineDev && !noteSeenBefore(d.id)) {
       showMsg('💥 You are aggressively loved');
       logMsg('aggr', '💥 You are aggressively loved', tms);
+      if (funBump('aggrgot') >= 3) unlockFun('aggrchamp');
       if (live) buzz([80, 60, 80, 60, 250], true);
     }
     if (m.t === 'askans' && !mineDev && typeof m.nid === 'string') {
       var outA = loadOut();
       var atxt = m.a === 'yes' ? '😈 Yes! Tonight.' : '😇 Maybe later';
-      if (outA[m.nid] === 0) { outA[m.nid] = 1; saveOut(outA); showMsg(atxt); logMsg('ask', 'Tonight? ' + atxt); if (m.a === 'yes') wantT0 = performance.now() / 1000; }
+      if (outA[m.nid] === 0) { outA[m.nid] = 1; saveOut(outA); showMsg(atxt); logMsg('ask', 'Tonight? ' + atxt); if (m.a === 'yes') { wantT0 = performance.now() / 1000; if (funBump('yes') >= 5) unlockFun('bootycall'); } }
     }
     if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
     if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
@@ -2477,6 +2623,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var catchingUp = false;   // true while the saved messages are being read after opening or returning
   function historyDone() {
     catchingUp = false;
+    setTimeout(function () { try { funMorning(); } catch (e) {} }, 1500);   // after presence is known
     setTimeout(maybeGoodMorning, 400);
     savePending();
     checkStreak();
@@ -2708,6 +2855,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     lastTouchAt = Math.max(lastTouchAt, nowMs);
     if (nowMs - lastTouchSave > 1000) { lastTouchSave = nowMs; lsSet(K('lasttouch'), lastTouchAt); }
     if (isDown) {
+      try { funPress(u, v, performance.now()); } catch (er) {}
       markDay('me', nowMs);
       if (nowMs - lastStreakCheck > 5000) { lastStreakCheck = nowMs; checkStreak(); }
       countSent();
@@ -2782,6 +2930,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
         now - seq.tip < SEQ_MS && now - seq.left < SEQ_MS && now - seq.right < SEQ_MS) {
       seq.tip = seq.left = seq.right = 0;
       startKissRain(now / 1000);
+      usedGesture('kissrain');
       send({ t: 'kiss', k: 'bg' });
     }
   }
@@ -2880,6 +3029,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     sessionTaps++;
     if (sessionTaps >= 200 && !aggrDone) {
       aggrDone = true;
+      usedGesture('aggr');
       showMsg('🚨 Love aggression identified');
       logMsg('aggr', '🚨 Love aggression identified');
       vib([80, 60, 80, 60, 80, 60, 250]);
@@ -3057,6 +3207,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       sentCount = 0; ach = {}; daysMe = {}; daysThem = {};
       lsSet(K('sent'), 0); lsSet(K('ach'), '{}'); lsSet(K('daysme'), ''); lsSet(K('daysthem'), '');
       [7, 30, 100, 365].forEach(function (n) { lsSet(K('flame' + n), ''); });
+      lsSet(K('fun'), '{}'); lsSet(K('funn'), '{}');
       showToast('Achievements cleared');
     }
     else if (a === 'luv') runFx('luvrain', {}, false);
