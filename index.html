@@ -1685,22 +1685,38 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   jarBox.addEventListener('click', function () { jarBox.hidden = true; });
   // flip: the screen turns to face the floor for a moment, then back up (works whichever way the phone reports it)
-  var flipSign = 0, flipDownAt = 0, flipDownSince = 0, flipUpAt = -1e9;
+  // Flip: the screen faces the floor for a moment (z below -6), then comes back up (z above 3).
+  // Gravity reads +9.8 with the screen up, so this works however the phone was held before.
+  var flipDownSince = 0, flipDownOk = 0, flipUpAt = -1e9, motionZ = null, motionWatch = 0;
   window.addEventListener('devicemotion', function (e) {
     var g = e.accelerationIncludingGravity;
-    if (!g || g.z == null || document.visibilityState !== 'visible') return;
-    var z = g.z, now = performance.now(), sg = z > 7 ? 1 : z < -7 ? -1 : 0;
-    if (z < -7) faceDownAt = now;
-    if (!sg) return;
-    if (!flipSign) { flipSign = sg; return; }
-    if (sg !== flipSign) {   // upside down
+    if (!g || g.z == null) return;
+    motionZ = g.z;
+    if (document.visibilityState !== 'visible') return;
+    var z = g.z, now = performance.now();
+    if (z < -6) {
+      faceDownAt = now;
       if (!flipDownSince) flipDownSince = now;
-      if (now - flipDownSince > 350) flipDownAt = now;
-    } else {
-      if (flipDownAt && now - flipDownAt < 4000) { flipUpAt = now; vib(20); }   // the jar is ready: hold the tip within 4 s
-      flipDownAt = 0; flipDownSince = 0;
+      if (now - flipDownSince > 250) flipDownOk = now;
+    } else if (z > 3) {
+      if (flipDownOk && now - flipDownOk < 4000) {   // back up: the jar is ready, hold the tip within 4 s
+        flipUpAt = now;
+        flipDownOk = 0;
+        vib([20, 40, 20]);
+        showToast('🫙 Now hold the bottom tip to open the jar', 4000);
+      }
+      flipDownSince = 0;
     }
   });
+  function motionCheck() {   // admin: show what the motion sensor reports
+    clearInterval(motionWatch);
+    var t0 = Date.now();
+    motionWatch = setInterval(function () {
+      var z = motionZ;
+      showToast(z == null ? 'No motion sensor data yet. Move the phone.' : 'Sensor z = ' + z.toFixed(1) + (z > 3 ? '  (face up)' : z < -6 ? '  (face down)' : ''), 1200);
+      if (Date.now() - t0 > 12000) clearInterval(motionWatch);
+    }, 400);
+  }
 
   // ---- Body map: drag from the bottom tip up to the dip, tap a spot, choose kiss, touch or bite ----
   var SPOT_TXT = { kiss: 'I want to kiss you… here 💋', touch: 'I want to touch you… here ✋', bite: 'I want to bite you… here 😈' };
@@ -3335,7 +3351,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Love jar'], ['body', 'Body map'], ['eggdad', 'Easter egg: Daddy (test)'], ['eggtoy', 'Easter egg: Toy (test)'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Love jar'], ['motion', 'Motion sensor check'], ['body', 'Body map'], ['eggdad', 'Easter egg: Daddy (test)'], ['eggtoy', 'Easter egg: Toy (test)'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -3367,6 +3383,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'good') runFx('good', {}, true);
     else if (a === 'note') openCompose();
     else if (a === 'jar') openJar();
+    else if (a === 'motion') { closeAdmin(); motionCheck(); }
     else if (a === 'body') openBodyPick();
     else if (a === 'eggdad') { closeAdmin(); openBodyPick({ test: true, fig: 'daddy' }); setTimeout(function () { daddyUp(); daddyDown(); }, 500); }
     else if (a === 'eggtoy') { closeAdmin(); openBodyPick({ test: true, fig: 'toy' }); setTimeout(toyTingle, 500); }
