@@ -1757,6 +1757,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     bvPick = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
     placeMark(bvPick.x, bvPick.y);
     document.getElementById('bvTop').textContent = 'Here? Choose what you want to do';
+    // no biting there
+    document.getElementById('bvChoose').querySelector('[data-a="bite"]').hidden = inPenis(x, y) || inVulva(x, y);
     document.getElementById('bvChoose').hidden = false;
     vib(20);
   });
