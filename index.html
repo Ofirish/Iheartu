@@ -488,7 +488,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   var pixelUntil = 0, binUntil = 0, warpT0 = -99, confettiUntil = 0, confettiAcc = 0;
   var wantT0 = -99, teaseT0 = -99, blushHold = false, steam = [];   // naughty effects
-  var tardisT0 = -99, matrixT0 = -99, sunT0 = -99, matrixCols = null;
+  var tardisT0 = -99, matrixT0 = -99, sunT0 = -99, matrixCols = null, giantT0 = -99, giantEnd = -99;
   var moodTint = null;   // the partner's mood colour on the heart, 'r,g,b'
   var stag = null;            // {t0, dir}
   var annivForce = false, annivToday = false;
@@ -903,7 +903,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     "Are you a sunrise? Because every day starts better with you.",
     "I'm not a photographer, but I can picture us together."
   ];
-  var FX_OK = { tardis: 1, matrix: 1, want: 1, tease: 1, luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
+  var FX_OK = { giant: 1, tardis: 1, matrix: 1, want: 1, tease: 1, luvrain: 1, luvtoo: 1, patronus: 1, saber: 1, iluToo: 1, pixel: 1, binary: 1, warp: 1, fh: 1, confetti: 1, rizz: 1, good: 1 };
   // ---- Vibration and sound ----
   // Inside the Android app the phone's own vibration motor is used (no "touch the page first" rule).
   var CAP = window.Capacitor;
@@ -1022,6 +1022,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       setTimeout(function () { startLove(performance.now() / 1000, 'My love is bigger on the inside', { quiet: true }); }, 2600);
       buzz([60, 120, 60, 120, 60, 120, 200], remote);
     }
+    else if (k === 'giant') { giantT0 = nowS; giantEnd = nowS + 10; boost = 0.16; sfx('love'); buzz([40, 30, 40, 30, 300], remote); }
     else if (k === 'matrix') { matrixT0 = nowS; matrixCols = null; buzz([20, 40, 20, 40, 20, 40, 20], remote); }
     else if (k === 'want') {      // blushing, steaming heart
       wantT0 = nowS; boost = 0.16;
@@ -1176,7 +1177,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     ['completionist', '🏆', 'Completionist', 'You found everything. Even the dirty ones.']
   ];
   // every secret gesture, for the Completionist
-  var GESTURES = ['kiss', 'kissrain', 'luvrain', 'luvtoo', 'patronus', 'saber', 'iluToo', 'pixel', 'binary', 'warp', 'fh', 'confetti', 'rizz', 'good',
+  var GESTURES = ['giant', 'kiss', 'kissrain', 'luvrain', 'luvtoo', 'patronus', 'saber', 'iluToo', 'pixel', 'binary', 'warp', 'fh', 'confetti', 'rizz', 'good',
     'want', 'tease', 'tardis', 'matrix', 'fog', 'ask', 'note', 'jar', 'body', 'mood', 'aggr'];
   function funGot() { try { return JSON.parse(lsGet(K('fun')) || '{}') || {}; } catch (e) { return {}; } }
   function funCounts() { try { return JSON.parse(lsGet(K('funn')) || '{}') || {}; } catch (e) { return {}; } }
@@ -2004,6 +2005,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
 
+  // Giant heart: springs up to fill the screen, stays 10 s (a tap shrinks it sooner), then settles back
+  function giantScale(now) {
+    var t = now - giantT0;
+    if (t < 0 || now > giantEnd + 1.2) return 1;
+    var up = t < 0.9 ? 1 + 1.35 * (1 - Math.pow(1 - t / 0.9, 3)) + 0.18 * Math.sin(t / 0.9 * Math.PI) : 2.35;
+    if (now > giantEnd) { var e = (now - giantEnd) / 1.2; up = 1 + (up - 1) * (1 - e * e * (3 - 2 * e)); }
+    return up;
+  }
   // Tardis: 0-1.6 s spin and shrink away, 2.0-3.4 s flicker back in, overshoot, settle
   function tardisState(now) {
     var t = now - tardisT0;
@@ -2245,7 +2254,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     ctx.rotate(sway);
     ctx.translate(0, -9 * S);
     if (td) { ctx.rotate(td.rot); ctx.globalAlpha = td.al; }
-    ctx.scale(S * k * (td ? td.sc : 1), S * k * (td ? td.sc : 1));
+    var gs = giantScale(now);
+    ctx.scale(S * k * (td ? td.sc : 1) * gs, S * k * (td ? td.sc : 1) * gs);
     var gr = Math.round(255 - 85 * love), gg = Math.round(79 + 31 * love), gb = Math.round(163 + 92 * love);
     ctx.shadowColor = 'rgba(' + gr + ',' + gg + ',' + gb + ',' + (0.95 * (1 - 0.5 * dull)) + ')';
     ctx.shadowBlur = (28 + 36 * beat + boost * 220 + love * 30) * glowF * dpr;
@@ -3159,11 +3169,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
   cv.addEventListener('pointerdown', function (e) {
+    var gN = performance.now() / 1000;
+    if (gN > giantT0 + 1 && gN < giantEnd) giantEnd = gN;   // a tap shrinks the giant heart
     countTap();
     var now = performance.now();
     var u = (e.clientX - cx) / S, v = (e.clientY - cy) / S;
     var id = e.pointerId == null ? 0 : e.pointerId;
-    ptrs[id] = { id: id, t0: now, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, u0: u, v0: v, len: 0, mv: 0, done: false, pair: false, timers: [], ang: null, sweep: 0, n: 0, inN: 0 };
+    ptrs[id] = { id: id, t0: now, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, u0: u, v0: v, len: 0, mv: 0, done: false, pair: false, timers: [], ang: null, sweep: 0, n: 0, inN: 0, pts: [[e.clientX, e.clientY]] };
     pressed = true;
     mineDown = true;
     lastSend = now;
@@ -3186,6 +3198,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var ang = Math.atan2(e.clientY - cy, e.clientX - cx);
       if (p.ang != null) { var da = ang - p.ang; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; p.sweep += da; }
       p.ang = ang; p.n++;
+      if (p.pts.length < 600) p.pts.push([e.clientX, e.clientY]);
       if (inHeart((e.clientX - cx) / S, (e.clientY - cy) / S)) p.inN++;
       // slow petting stroke on the heart
       var dur = now - p.t0;
@@ -3201,8 +3214,39 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     lastSend = now;
     touch(e, false);
   });
+  // Is this stroke a heart drawn around the heart? Closed loop around the centre, two bulges on top with a dip
+  // between them, and a point at the bottom. A circle has no dip, so it stays the Tardis.
+  function isHeartShape(pts) {
+    if (pts.length < 12) return false;
+    var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    pts.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+    var w = x1 - x0, h = y1 - y0;
+    if (w < 18 * S || h < 18 * S) return false;                      // bigger than the heart itself
+    if (!(cx > x0 && cx < x1 && cy > y0 && cy < y1)) return false;   // goes around it
+    var a = pts[0], b = pts[pts.length - 1];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 0.3 * Math.max(w, h)) return false;   // closed
+    var mx = (x0 + x1) / 2, top = y0 + h * 0.5;
+    var topL = 1e9, topR = 1e9, mid = 1e9, low = -1e9, lowX = 0;
+    pts.forEach(function (q, i) {
+      if (q[1] < top) {
+        if (q[0] < mx - w * 0.15) topL = Math.min(topL, q[1]);
+        else if (q[0] > mx + w * 0.15) topR = Math.min(topR, q[1]);
+      }
+      if (q[1] > low) { low = q[1]; lowX = q[0]; }
+      var r = pts[i + 1];   // where the stroke crosses the middle line in the top half
+      if (r && (q[0] - mx) * (r[0] - mx) <= 0 && q[0] !== r[0]) {
+        var yc = q[1] + (r[1] - q[1]) * (mx - q[0]) / (r[0] - q[0]);
+        if (yc < top) mid = Math.min(mid, yc);
+      } else if (r && q[0] === mx && q[1] < top) mid = Math.min(mid, q[1]);
+    });
+    if (topL > 1e8 || topR > 1e8 || mid > 1e8) return false;
+    var dipDepth = mid - Math.max(topL, topR);
+    return dipDepth > h * 0.1 && Math.abs(lowX - mx) < w * 0.25;    // a dip at the top, the point at the bottom middle
+  }
   function strokeEnd(p, now) {
     var dur = now - p.t0;
+    // a heart shape drawn around the heart: giant heart (checked before the Tardis circle)
+    if (!p.done && !p.pair && dur < 6000 && p.n > 12 && p.inN <= p.n * 0.25 && isHeartShape(p.pts)) { p.done = true; doFx('giant', {}); return; }
     // a full circle drawn around the heart (outside it): Tardis
     if (!p.done && !p.pair && Math.abs(p.sweep) > 5.6 && dur < 4000 && p.n > 6 && p.inN <= p.n * 0.2 && !inHeart(p.u0, p.v0)) {
       p.done = true; doFx('tardis', {}); return;
