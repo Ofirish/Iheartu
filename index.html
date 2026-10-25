@@ -3300,7 +3300,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function strokeEnd(p, now) {
     var dur = now - p.t0;
     // a heart shape drawn around the heart: giant heart (checked before the Tardis circle)
-    if (!p.done && !p.pair && dur < 6000 && p.n > 12 && p.inN <= p.n * 0.25 && isHeartShape(p.pts)) { p.done = true; doFx('giant', {}); return; }
+    if (!p.done && !p.pair && dur < 6000 && p.n > 12 && p.inN <= p.n * 0.4 && isHeartShape(p.pts)) { p.done = true; doFx('giant', {}); return; }
     // a full circle drawn around the heart (outside it): Tardis
     if (!p.done && !p.pair && Math.abs(p.sweep) > 5.6 && dur < 4000 && p.n > 6 && p.inN <= p.n * 0.2 && !inHeart(p.u0, p.v0)) {
       p.done = true; doFx('tardis', {}); return;
