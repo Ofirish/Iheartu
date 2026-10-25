@@ -1661,44 +1661,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       else { showMsg("Couldn't add it to the jar. Try again."); openJar(); jarInput.value = t; }
     });
   });
-  // Admin "Fill the jar": Ofir's reasons, dropped in once as his (fixed ids, so a second tap adds no duplicates)
-  var JAR_FILL = [
-    "Your mind is Sexy!",
-    "You see through my down moods and love me anyway.",
-    "I love how you think.",
-    "I could listen to you explain anything all day long",
-    "You are a smart cookie for smart daddy",
-    "You're my calm in every storm.",
-    "Your arms are the safest place I know.",
-    "I can tell you anything, and you never make me feel small.",
-    "You're my home",
-    "I never wonder if you're mine. I just know.",
-    "You choose me every day",
-    "You love me even on the days I'm hard to love.",
-    "Your \"good morning\" makes my whole day and your hole make my night.",
-    "You notice the little things",
-    "You remember everything",
-    "Falling asleep with you is my favourite thing",
-    "You hold my heart gently, even when it's heavy.",
-    "The way you talk to me makes me happy.",
-    "Your curls are love",
-    "Every curve of you was made for my hands.",
-    "You're my good girl and my naughty girl, and I can't get enough of either.",
-    "I love the way you taste, and I'm always hungry for more.",
-    "The sounds you make when I'm inside you are my favourite song.",
-    "I love how wet you get just from me telling you what to do."
-  ];
-  function fillJar() {
-    var added = 0;
-    JAR_FILL.forEach(function (n, i) {
-      var jid = 'fill' + (i < 9 ? '0' : '') + (i + 1);
-      if (jarStore[jid]) return;
-      adoptJar({ jid: jid, n: n, dv: did }, true, Date.now());
-      added++;
-      setTimeout(function () { sendReliable({ t: 'jar', jid: jid, n: n }); }, i * 120);
-    });
-    showToast(added ? '🫙 Dropped ' + added + ' reasons into the jar' : '🫙 They are already in the jar', 4000);
-  }
   document.getElementById('jarPull').addEventListener('click', function () { jarPanel.hidden = true; pullJar(); });
   document.getElementById('jarClose').addEventListener('click', function () { jarPanel.hidden = true; });
   var jarBox = document.getElementById('jarBox');
@@ -3389,7 +3351,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     { key: 'zone', label: 'Their time zone', opts: [['auto', 'Auto'], ['same', 'Same as you'], ['Asia/Tokyo', 'Tokyo'], ['America/New_York', 'New York'], ['Australia/Sydney', 'Sydney']] },
     { key: 'tickled', label: 'Last touch (for resting)', opts: [['auto', 'Auto'], ['none', 'Never'], ['2m', '2 min ago'], ['yday', 'Yesterday'], ['3d', '3 days ago']] }
   ];
-  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Love jar'], ['filljar', 'Fill the jar (24 reasons)'], ['motion', 'Motion sensor check'], ['body', 'Body map'], ['eggdad', 'Easter egg: Daddy (test)'], ['eggtoy', 'Easter egg: Toy (test)'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
+  var ACTIONS = [['split', 'Split screen test'], ['ach', 'Achievements'], ['clearach', 'Clear achievements'], ['love', 'Play “I love you”'], ['away1', 'Away message ×1'], ['away9', 'Away message ×9'], ['ripple', 'Ripple'], ['kiss', 'Kiss rain'], ['kissdbl', 'Kisses'], ['luv', 'I love you rain'], ['patronus', 'Patronus'], ['saber', 'Lightsabers'], ['ilutoo', 'I love you too'], ['pixel', '8-bit heart'], ['binary', 'Binary heart'], ['warp', 'Hyperspace'], ['fh', 'Finger heart'], ['confetti', 'Confetti'], ['rizz', 'Rizz line'], ['good', 'Good girl'], ['note', 'Hide a note'], ['jar', 'Love jar'], ['motion', 'Motion sensor check'], ['body', 'Body map'], ['eggdad', 'Easter egg: Daddy (test)'], ['eggtoy', 'Easter egg: Toy (test)'], ['gold', 'Anniversary glow'], ['buzz', 'Buzz test'], ['relay', 'Relay check'], ['link', 'Copy room link'], ['join', 'Join another room'], ['reset', 'Reset all']];
 
   function refreshAdmin() {
     var bs = adminEl.querySelectorAll('button[data-group]');
@@ -3421,7 +3383,6 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else if (a === 'good') runFx('good', {}, true);
     else if (a === 'note') openCompose();
     else if (a === 'jar') openJar();
-    else if (a === 'filljar') fillJar();
     else if (a === 'motion') { closeAdmin(); motionCheck(); }
     else if (a === 'body') openBodyPick();
     else if (a === 'eggdad') { closeAdmin(); openBodyPick({ test: true, fig: 'daddy' }); setTimeout(function () { daddyUp(); daddyDown(); }, 500); }
