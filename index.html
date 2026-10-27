@@ -159,6 +159,17 @@ body {
 .bodyview .bvrow { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .bodyview .bvrow[hidden] { display: none; }
 .bodyview button { padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,130,190,.6); background: rgba(255,79,163,.18); color: #ffe9f7; font: inherit; font-size: 1rem; }
+/* achievement details, clear-inbox steps */
+#achInfo .big { font-size: 3rem; line-height: 1; margin: 2px 0 6px; }
+#achInfo .name { font-family: var(--font-display); font-style: italic; font-size: 1.7rem; margin: 0 0 4px; }
+#achInfo .tag { opacity: .8; font-style: italic; }
+#achInfo .how { text-align: left; background: rgba(255,79,163,.1); border-radius: 12px; padding: 10px 12px; font-size: .95rem; }
+#achInfo .when { font-size: .8rem; opacity: .6; }
+#achList li.tap, #inboxList li.tap { cursor: pointer; }
+#clearPanel .warn { color: #ffb3c8; }
+#clearPanel button.danger { background: #d0103a; border-color: #ff4060; color: #fff; font-size: 1.15rem; padding: 14px 22px; font-weight: 600; box-shadow: 0 0 18px rgba(255,40,80,.6); }
+#inbox .undo { margin: 0 0 8px; }
+#inbox .undo[hidden] { display: none; }
 #joinPanel .err { color: #ff9ab8; font-size: .85rem; margin: 8px 0 0; }
 #joinPanel .err[hidden] { display: none; }
 .mail::after { content: ""; position: absolute; inset: -8px; }
@@ -329,6 +340,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
 </div>
 <div class="panel" id="inbox" hidden>
   <p>Messages</p>
+  <div class="row undo" id="inboxUndoRow" hidden><button type="button" id="inboxUndo">↩ Undo clear</button></div>
   <ul id="inboxList"></ul>
   <div class="row"><button type="button" id="inboxClear">Clear</button><button type="button" id="inboxClose">Close</button></div>
 </div>
@@ -357,6 +369,18 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   <div class="bvegg" id="bvEgg" aria-hidden="true"></div>
   <div class="bvrow" id="bvChoose" hidden><button type="button" data-a="kiss">💋 Kiss</button><button type="button" data-a="touch">✋ Touch</button><button type="button" data-a="bite">😈 Bite</button></div>
   <div class="bvrow"><button type="button" id="bvClose">Cancel</button></div>
+</div>
+<div class="panel" id="achInfo" hidden>
+  <div class="big" id="aiEmoji"></div>
+  <p class="name" id="aiName"></p>
+  <p class="tag" id="aiTag"></p>
+  <p class="how" id="aiHow"></p>
+  <p class="when" id="aiWhen"></p>
+  <div class="row"><button type="button" id="aiClose">Close</button></div>
+</div>
+<div class="panel" id="clearPanel" hidden>
+  <p id="clearText"></p>
+  <div class="row" id="clearRow"></div>
 </div>
 <div class="panel" id="moodPanel" hidden>
   <p>How do you feel?</p>
@@ -1224,6 +1248,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     ['powercouple', '💑', 'Power Couple', 'Unstoppable.'],
     ['royalty', '👑', 'Love Royalty', 'King and queen of hearts.']
   ];
+  var FUN_HOW = {"nightowl": "Touch the heart between 03:00 and 04:00.", "buttdial": "Tap the heart while the phone is lying face down.", "jackpot": "Pull the same reason from the love jar twice in a row (it happens by luck, about 1 pull in 12).", "lightning": "Press the heart within one second of your partner pressing it.", "dizzy": "Draw the Tardis circle around the heart 5 times in one day.", "siamese": "Hold the heart together with your partner for 60 seconds without letting go.", "earlybird": "Be the first of you two to open the heart in the morning, 7 days in a row.", "poet": "Drop 10 reasons into the love jar.", "memory": "Look through 50 different messages in the envelope.", "bullseye": "Hit the very centre of the heart 10 times in a row.", "mindreader": "Both of you pick the same mood within 5 minutes of each other.", "aggrchamp": "Receive \"You are aggressively loved\" 3 times.", "insatiable": "Send \"I want you! now!\" (triple tap the dip) 3 times in one day.", "grabby": "Choose ✋ Touch on the body map 10 times.", "vampire": "Choose 😈 Bite on the body map 5 times.", "explorer": "Choose 10 different spots on the body map.", "favspot": "Choose the same spot on the body map 5 times.", "weatherman": "Fog up your partner’s screen (steamy glass) 10 times.", "bootycall": "Get 5 😈 Yes answers to \"Tonight?\".", "teasemaster": "Do the unzip (dip down to the tip) 10 times.", "yesdaddy": "Start the Matrix rain 7 times.", "overheated": "Send \"I want you\", the steamy glass and \"Tonight?\" within 10 minutes.", "completionist": "Use every secret gesture at least once.", "firsttouch": "Touch the heart for the first time in a new day.", "heartiversary": "Touch the heart on your anniversary.", "loveextreme": "Tap the heart 500 times in one visit.", "zen": "Hold the heart on your own for 30 seconds.", "doubletrouble": "Press the heart within 0.2 seconds of your partner.", "boomerang": "Take turns pressing the heart, each answering within 3 seconds, three times each.", "midnight": "Touch the heart between 00:00 and 01:00.", "coffee": "Each of you opens the heart in your own morning (07:00-10:00, your local time) on the same day.", "lunch": "Touch the heart between 12:00 and 13:00 on 5 days in a row.", "weekend": "Touch the heart on 4 Saturdays in a row.", "wizard": "Cast the patronus (fast sideways flick) 10 times.", "jedi": "Light the lightsabers (two fingers on opposite sides) 10 times.", "spacecadet": "Jump to hyperspace (fast swipe up at night) on 5 different nights.", "retro": "Unlock the 8-bit heart 5 times.", "party": "Shake the phone for confetti 10 times.", "bighearted": "Draw a heart around the heart to make it giant 5 times.", "penpal": "Send 10 hidden notes.", "maillover": "Open the envelope 30 times.", "smooch": "Send 50 double-tap kisses.", "kissstorm": "Start the kiss rain (tip, then both top bulges) 10 times.", "rizzlord": "Get 25 cheesy lines (6 taps in one spot on empty space).", "goodboy": "Receive \"Good girl\" from your partner 10 times.", "binarylover": "Show the binary heart (hold the dip) 5 times.", "rainbow": "Use 6 different moods.", "mooddesigner": "Create your own mood with \"+ New mood\".", "cuddle": "Pick the Cuddly mood 10 times.", "summoned": "Set your mood to Missing you, and your partner touches the heart within 5 minutes.", "honeyjar": "Pull 25 reasons from the love jar.", "fulljar": "The love jar holds 50 reasons from both of you.", "fullcircle": "Read every one of your partner’s reasons in the jar at least once (5 or more).", "cartographer": "Choose 25 different spots on the body map.", "kisscollector": "Choose 💋 Kiss on 15 different spots of the body map.", "daddyfav": "Send a body-map spot on Daddy’s map 10 times.", "toybox": "Send a body-map spot on Toy’s map 10 times.", "spice3": "Send \"I want you\", the unzip and \"Tonight?\" within one evening (6 hours).", "steamroom": "Wipe 10 steamy glasses your partner sent you.", "tonightevery": "Get 3 😈 Yes answers to \"Tonight?\" within one week.", "patience": "Get a \"Maybe later\" and then a \"Yes\" on the same day.", "risingstar": "Set off the Daddy easter egg on the body map 10 times.", "bellringer": "Set off the Toy easter egg on the body map 10 times.", "giftwrapped": "Do the unzip and then send \"Tonight?\" within one minute.", "habit": "Touch the heart on 14 days in a row.", "monthly": "Touch the heart on 30 days in a row.", "sleepover": "Each of you opens the heart in your own late night (23:00-02:00, your local time) on the same night.", "sunrise": "Both of you see the good-morning sunrise on the same day.", "matching": "You both have the same mood on 3 days in a row.", "powercouple": "Reach 1,000 touches between the two of you.", "royalty": "Unlock 40 of the fun achievements."};
   // every secret gesture, for the Completionist
   var GESTURES = ['giant', 'kiss', 'kissrain', 'luvrain', 'luvtoo', 'patronus', 'saber', 'iluToo', 'pixel', 'binary', 'warp', 'fh', 'confetti', 'rizz', 'good',
     'want', 'tease', 'tardis', 'matrix', 'fog', 'ask', 'note', 'jar', 'body', 'mood', 'aggr'];
@@ -1398,6 +1423,33 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (seenT.length >= 50) unlockFun('memory');
   }
 
+  // ---- Tapping an achievement (in the list or the envelope) explains it ----
+  var achInfo = document.getElementById('achInfo');
+  function showAchInfo(o) {   // o: { e, name, tag, how, when }
+    document.getElementById('aiEmoji').textContent = o.e || '🏆';
+    document.getElementById('aiName').textContent = o.name || '';
+    document.getElementById('aiTag').textContent = o.tag || '';
+    document.getElementById('aiHow').textContent = o.how ? 'How you got it: ' + o.how : '';
+    document.getElementById('aiWhen').textContent = o.when ? 'Unlocked ' + new Date(o.when).toLocaleString() : '';
+    achInfo.hidden = false;
+  }
+  document.getElementById('aiClose').addEventListener('click', function () { achInfo.hidden = true; });
+  function funInfo(id) {
+    for (var i = 0; i < FUN.length; i++) if (FUN[i][0] === id) {
+      var f = FUN[i];
+      showAchInfo({ e: f[1], name: f[2], tag: f[3], how: FUN_HOW[id], when: funGot()[id] });
+      return true;
+    }
+    return false;
+  }
+  function achInfoFromText(txt, when) {   // envelope entries: find which achievement the line is about
+    for (var i = 0; i < FUN.length; i++) if (txt.indexOf(FUN[i][1] + ' ' + FUN[i][2] + ':') === 0) return funInfo(FUN[i][0]);
+    var m = /([\d,]+) hearts sent/.exec(txt);
+    if (m) { showAchInfo({ e: '🏆', name: m[1] + ' hearts sent', tag: 'A milestone of love.', how: 'You have touched the heart ' + m[1] + ' times in total.', when: when }); return true; }
+    var st = /(\d+) days in a row/.exec(txt);
+    if (st) { showAchInfo({ e: '🔥', name: st[1] + ' days in a row', tag: 'A streak of love.', how: 'Both of you touched the heart on ' + st[1] + ' days in a row.', when: when }); return true; }
+    return false;
+  }
   var achEl = document.getElementById('ach');
   var achList = document.getElementById('achList');
   function openAch() {
@@ -1410,12 +1462,16 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var sm = document.createElement('small');
       sm.textContent = new Date(ach[m]).toLocaleDateString();
       li.appendChild(sm);
+      li.className = 'tap';
+      li.addEventListener('click', function () { showAchInfo({ e: '🏆', name: m.toLocaleString('en-US') + ' hearts sent', tag: 'A milestone of love.', how: 'You have touched the heart ' + m.toLocaleString('en-US') + ' times in total.', when: ach[m] }); });
       achList.appendChild(li);
     });
     [7, 30, 100, 365].forEach(function (n) {
       if (!lsGet(K('flame' + n))) return;
       var li = document.createElement('li');
       li.textContent = '\uD83D\uDD25 ' + n + ' days in a row';
+      li.className = 'tap';
+      li.addEventListener('click', function () { showAchInfo({ e: '🔥', name: n + ' days in a row', tag: 'A streak of love.', how: 'Both of you touched the heart on ' + n + ' days in a row.' }); });
       achList.appendChild(li);
     });
     var got = funGot();
@@ -1426,6 +1482,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var sm = document.createElement('small');
       sm.textContent = f[3];
       li.appendChild(sm);
+      li.className = 'tap';
+      li.addEventListener('click', function () { funInfo(f[0]); });
       achList.appendChild(li);
     });
     if (locked) {
@@ -2636,6 +2694,9 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function openInbox() {
     inboxList.textContent = '';
     var a = loadInbox().slice().reverse();
+    var und = undoInfo();
+    document.getElementById('inboxUndoRow').hidden = !und;
+    if (und) { var left = Math.ceil((300000 - (Date.now() - und.at)) / 60000); document.getElementById('inboxUndo').textContent = '↩ Undo clear (' + left + ' min left)'; }
     try { funInboxSeen(a); if (funBump('mailopen') >= 30) unlockFun('maillover'); } catch (e) {}
     if (!a.length) {
       var e = document.createElement('li'); e.className = 'empty'; e.textContent = 'No messages yet'; inboxList.appendChild(e);
@@ -2650,6 +2711,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
         li.className = 'note';
         li.textContent = m.x;
         li.addEventListener('click', function () { inboxEl.hidden = true; openSpot({ x: m.sx, y: m.sy, a: m.sa, f: m.sf, nid: '' }, true); });
+      } else if (m.k === 'ach' || m.k === 'streak') {
+        li.className = 'tap';
+        li.textContent = m.x;
+        li.addEventListener('click', function () { achInfoFromText(m.x, m.t); });
       } else li.textContent = m.x;
       var sm = document.createElement('small');
       sm.textContent = (m.k === 'note' ? 'Hidden note \u00B7 ' : '') + fmtWhen(m.t);
@@ -2697,7 +2762,73 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   markMail();
   mailBtn.addEventListener('click', function (e) { e.stopPropagation(); if (inboxEl.hidden) openInbox(); else inboxEl.hidden = true; });
   document.getElementById('inboxClose').addEventListener('click', function () { inboxEl.hidden = true; });
-  document.getElementById('inboxClear').addEventListener('click', function () { lsSet(K('inbox'), '[]'); lsSet(K('inboxnew'), 0); markMail(); openInbox(); });
+  // Clearing the envelope: offer an export, ask three times (the last with a big red button), allow undo for 5 minutes
+  var clearPanel = document.getElementById('clearPanel');
+  function exportAll() {
+    var data = { app: 'I heart U', exported: new Date().toISOString(), room: room, data: {} };
+    try {
+      var pre = (NS ? NS + ':' : '') + 'hb-' + room + '-';
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf(pre) === 0) {
+          var v = localStorage.getItem(key);
+          try { data.data[key.slice(pre.length)] = JSON.parse(v); } catch (e) { data.data[key.slice(pre.length)] = v; }
+        }
+      }
+    } catch (e) {}
+    var txt = JSON.stringify(data, null, 2), name = 'iheartu-backup-' + dayKey(Date.now()) + '.json';
+    try {
+      var file = new File([txt], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: name }).catch(function () {}); return; }
+    } catch (e) {}
+    try {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' }));
+      a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('Saved ' + name, 3000);
+    } catch (e) {
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { showToast('Backup copied to the clipboard', 3000); });
+    }
+  }
+  function clearStep(n) {
+    var count = loadInbox().length, row = document.getElementById('clearRow'), t = document.getElementById('clearText');
+    row.textContent = '';
+    function btn(label, fn, cls) { var b = document.createElement('button'); b.type = 'button'; b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', fn); row.appendChild(b); }
+    t.className = n === 3 ? 'warn' : '';
+    if (n === 1) {
+      t.textContent = 'Clear all ' + count + ' messages? Save a backup file first, just in case.';
+      btn('💾 Save backup', exportAll); btn('Continue', function () { clearStep(2); }); btn('Cancel', function () { clearPanel.hidden = true; });
+    } else if (n === 2) {
+      t.textContent = 'Are you sure? Notes, receipts, jar pulls and achievement messages in the envelope will all be removed.';
+      btn('Yes, continue', function () { clearStep(3); }); btn('Cancel', function () { clearPanel.hidden = true; });
+    } else {
+      t.textContent = 'Last chance. You can still undo for 5 minutes after this.';
+      btn('Delete all messages', doClear, 'danger'); btn('Cancel', function () { clearPanel.hidden = true; });
+    }
+    clearPanel.hidden = false;
+  }
+  function doClear() {
+    lsSet(K('inboxundo'), JSON.stringify({ at: Date.now(), list: loadInbox() }));
+    lsSet(K('inbox'), '[]'); lsSet(K('inboxnew'), 0);
+    clearPanel.hidden = true;
+    markMail(); openInbox();
+  }
+  function undoInfo() {
+    try { var u = JSON.parse(lsGet(K('inboxundo')) || 'null'); if (u && Date.now() - u.at < 300000) return u; } catch (e) {}
+    return null;
+  }
+  document.getElementById('inboxClear').addEventListener('click', function () { if (loadInbox().length) clearStep(1); });
+  document.getElementById('inboxUndo').addEventListener('click', function () {
+    var u = undoInfo();
+    if (!u) return;
+    var now = loadInbox(), all = u.list.concat(now);   // anything new since the clear is kept too
+    all.sort(function (p, q) { return p.t - q.t; });
+    lsSet(K('inbox'), JSON.stringify(all.slice(-60)));
+    lsSet(K('inboxundo'), '');
+    openInbox();
+    showToast('Messages restored', 2500);
+  });
 
   // Short feedback fades by itself. Messages (showMsg) stay until tapped, so none is missed.
   var stickyQ = [];
