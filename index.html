@@ -1174,7 +1174,55 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     ['teasemaster', '🎀', 'Tease Master', 'Worth the wait.'],
     ['yesdaddy', '🍆', 'Yes, Daddy', 'Daddy ♥ Toy forever.'],
     ['overheated', '💦', 'Overheated', 'Somebody open a window.'],
-    ['completionist', '🏆', 'Completionist', 'You found everything. Even the dirty ones.']
+    ['completionist', '🏆', 'Completionist', 'You found everything. Even the dirty ones.'],
+    ['firsttouch', '🥇', 'First Touch of the Day', 'Love never sleeps.'],
+    ['heartiversary', '🎂', 'Heartiversary', 'Another year of us.'],
+    ['loveextreme', '💯', 'Love Extreme', 'Off the charts.'],
+    ['zen', '🧘', 'Zen Lover', 'Deep breaths, deep love.'],
+    ['doubletrouble', '🫶', 'Double Trouble', 'Perfect sync.'],
+    ['boomerang', '🔁', 'Boomerang', 'Love ping-pong.'],
+    ['midnight', '🌙', 'Midnight Snack', 'Craving you.'],
+    ['coffee', '☕', 'Coffee Date', 'Good morning from both sides of the world.'],
+    ['lunch', '🍽️', 'Lunch Break Love', 'The best part of the workday.'],
+    ['weekend', '🎉', 'Weekend Warrior', 'Shabbat shalom, my love.'],
+    ['wizard', '🧙', 'Wizard', 'Expecto my heart.'],
+    ['jedi', '⚔️', 'Jedi Master', 'The Force is strong with us.'],
+    ['spacecadet', '🚀', 'Space Cadet', 'Punch it.'],
+    ['retro', '👾', 'Retro Gamer', 'Insert love to continue.'],
+    ['party', '🎊', 'Party Animal', 'Every day is a celebration.'],
+    ['bighearted', '🫀', 'Big Hearted', 'Love this big.'],
+    ['penpal', '💌', 'Pen Pal', 'Words are your love language.'],
+    ['maillover', '📬', 'Mail Lover', 'Checking for love letters.'],
+    ['smooch', '💋', 'Smooch Machine', 'Lips of steel.'],
+    ['kissstorm', '🌧️', 'Kiss Storm', 'Forecast: kisses.'],
+    ['rizzlord', '🗯️', 'Rizz Lord', 'Smooth operator.'],
+    ['goodboy', '🐶', 'Good Boy Too', "Who's a good girl?"],
+    ['binarylover', '🔢', 'Binary Lover', '01001100 01101111 01110110 01100101'],
+    ['rainbow', '🌈', 'Rainbow', 'All the colours of love.'],
+    ['mooddesigner', '🎨', 'Mood Designer', 'Feelings, custom made.'],
+    ['cuddle', '🧸', 'Cuddle Monster', 'Squeeze level: max.'],
+    ['summoned', '🥺', 'Missing You Badge', 'Summoned.'],
+    ['honeyjar', '🍯', 'Honey Jar', 'Sweet tooth.'],
+    ['fulljar', '🫙', 'Full Jar', 'Overflowing.'],
+    ['fullcircle', '🔁', 'Full Circle', 'You know all my reasons.'],
+    ['cartographer', '🗺️', 'Cartographer', 'Mapped every inch.'],
+    ['kisscollector', '💋', 'Kiss Collector', 'Nowhere unkissed.'],
+    ['daddyfav', '🧔', "Daddy's Favourite", 'Yes, Daddy.'],
+    ['toybox', '🎀', 'Toy Box', 'Playtime.'],
+    ['spice3', '🌶️', 'Spice Level 3', 'Hot hot hot.'],
+    ['steamroom', '🚿', 'Steam Room', 'Squeaky clean.'],
+    ['tonightevery', '🔥', 'Tonight Every Night', 'On fire.'],
+    ['patience', '😇', 'Patience Pays', 'Worth the wait.'],
+    ['risingstar', '🍆', 'Rising Star', 'Up, up and away.'],
+    ['bellringer', '🔔', 'Bell Ringer', 'Ding ding.'],
+    ['giftwrapped', '🎀', 'Gift Wrapped', 'Unwrap me.'],
+    ['habit', '📅', 'Habit Forming', 'Love is a habit.'],
+    ['monthly', '📆', 'Monthly Lovers', '30 days of us.'],
+    ['sleepover', '🛌', 'Sleepover', 'Pillow talk across time zones.'],
+    ['sunrise', '☀️', 'Sunrise Buddies', 'Same sky, same love.'],
+    ['matching', '🧩', 'Matching Moods', 'In tune.'],
+    ['powercouple', '💑', 'Power Couple', 'Unstoppable.'],
+    ['royalty', '👑', 'Love Royalty', 'King and queen of hearts.']
   ];
   // every secret gesture, for the Completionist
   var GESTURES = ['giant', 'kiss', 'kissrain', 'luvrain', 'luvtoo', 'patronus', 'saber', 'iluToo', 'pixel', 'binary', 'warp', 'fh', 'confetti', 'rizz', 'good',
@@ -1192,6 +1240,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     showMsg(f[1] + ' ' + f[2] + ' unlocked! ' + f[3]);
     logMsg('ach', f[1] + ' ' + f[2] + ': ' + f[3]);
     vib([40, 40, 40, 40, 160]);
+    if (Object.keys(got).length >= 40) setTimeout(function () { unlockFun('royalty'); }, 50);
     return true;
   }
   // counters; keys ending in @ count per day and are forgotten the next day
@@ -1212,25 +1261,86 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (all) unlockFun('completionist');
   }
   var heatAt = {};   // Overheated: want, fog and Tonight? within 10 minutes
+  function spiceCheck() {   // Spice Level 3: I want you, unzip and Tonight? in one evening; Gift Wrapped: unzip then Tonight? within a minute
+    var n = Date.now();
+    if (['want', 'tease', 'ask'].every(function (k) { return heatAt[k] && n - heatAt[k] < 6 * 3600000; })) unlockFun('spice3');
+    if (heatAt.tease && heatAt.ask && heatAt.ask >= heatAt.tease && heatAt.ask - heatAt.tease < 60000) unlockFun('giftwrapped');
+  }
   function heat(kind) {
     heatAt[kind] = Date.now();
+    spiceCheck();
     if (['want', 'fog', 'ask'].every(function (k) { return heatAt[k] && Date.now() - heatAt[k] < 600000; })) unlockFun('overheated');
+  }
+  function funSetAdd(key, item) {   // a set kept in the counters; returns its size
+    var c = funCounts(), o = c[key] || {};
+    o[item] = (o[item] || 0) + 1; c[key] = o;
+    lsSet(K('funn'), JSON.stringify(c));
+    return Object.keys(o).length;
+  }
+  function funSetHas(key, item) { var o = funCounts()[key] || {}; return !!o[item]; }
+  function runOfDays(key, stepDays, want) {   // consecutive days (or weeks) ending today that are in the set
+    var d = new Date(), n = 0;
+    while (n < want && funSetHas(key, dayKey(d.getTime()))) { n++; d.setDate(d.getDate() - stepDays); }
+    return n;
+  }
+  function funTimes(key, keepMs) {   // timestamps within a window
+    var c = funCounts(), now = Date.now(), a = (c[key] || []).filter(function (t) { return now - t < keepMs; });
+    a.push(now); c[key] = a.slice(-20); lsSet(K('funn'), JSON.stringify(c));
+    return a.length;
   }
   function funAfterFx(k) {   // things you do yourself
     usedGesture(k);
+    var MANY = { patronus: ['wizard', 10], saber: ['jedi', 10], pixel: ['retro', 5], confetti: ['party', 10], giant: ['bighearted', 5], kiss: ['smooch', 50], rizz: ['rizzlord', 25], binary: ['binarylover', 5] };
+    if (MANY[k] && funBump('n_' + k) >= MANY[k][1]) unlockFun(MANY[k][0]);
+    if (k === 'warp' && funSetAdd('warpdays', dayKey(Date.now())) >= 5) unlockFun('spacecadet');
+    if (k === 'want' || k === 'tease') { heatAt[k] = Date.now(); spiceCheck(); }
     if (k === 'tardis' && funBump('tardis', true) >= 5) unlockFun('dizzy');
     if (k === 'want') { heat('want'); if (funBump('want', true) >= 3) unlockFun('insatiable'); }
     if (k === 'tease' && funBump('tease') >= 10) unlockFun('teasemaster');
     if (k === 'matrix' && funBump('matrix') >= 7) unlockFun('yesdaddy');
   }
   var bullRun = 0, faceDownAt = -1e9, holdTogetherSince = 0;
+  var altCount = 0, altLast = '', altAt = 0;
+  function boomerang(who) {   // alternating presses, each answered within 3 s
+    var n = Date.now();
+    if (altLast && altLast !== who && n - altAt < 3000) altCount++; else if (altLast !== who || n - altAt >= 3000) altCount = 0;
+    altLast = who; altAt = n;
+    if (altCount >= 5) unlockFun('boomerang');
+  }
+  var myPressAt = -1e9;
+  function funPartnerPress(m) {   // every press of theirs that arrives live
+    var n = performance.now();
+    if (n - myPressAt < 200) unlockFun('doubletrouble');
+    boomerang('them');
+    if (myMood && myMood.mo && myMood.mo.l === 'Missing you' && Date.now() - myMood.at < 300000) unlockFun('summoned');
+    if (funBump('partnerpress') + sentCount >= 1000) unlockFun('powercouple');
+  }
   function funPress(u, v, nowMs) {   // every press of your finger on the heart
+    var dt = new Date(), today = dayKey(dt.getTime()), hr = dt.getHours();
+    myPressAt = nowMs;
+    if (funGet('lastpressday') !== today) { funSet('lastpressday', today); unlockFun('firsttouch'); }
+    if (annivToday) unlockFun('heartiversary');
+    if (hr === 0) unlockFun('midnight');
+    if (hr === 12) { funSetAdd('lunchdays', today); if (runOfDays('lunchdays', 1, 5) >= 5) unlockFun('lunch'); }
+    if (dt.getDay() === 6) { funSetAdd('satdays', today); if (runOfDays('satdays', 7, 4) >= 4) unlockFun('weekend'); }
+    funSetAdd('pressdays', today);
+    var run = runOfDays('pressdays', 1, 30);
+    if (run >= 14) unlockFun('habit');
+    if (run >= 30) unlockFun('monthly');
+    boomerang('me');
+    for (var rid in remote) { var rd2 = remote[rid].downAt; if (rd2 && nowMs - rd2 >= 0 && nowMs - rd2 < 200) unlockFun('doubletrouble'); }
+    if (sentCount + (funGet('partnerpress') || 0) >= 1000) unlockFun('powercouple');
     if (new Date().getHours() === 3) unlockFun('nightowl');
     if (performance.now() - faceDownAt < 800) unlockFun('buttdial');
     if (Math.abs(u) < 1.4 && Math.abs(v - 0.5) < 1.4) { if (++bullRun >= 10) unlockFun('bullseye'); } else bullRun = 0;
     // answering their touch within a second
     for (var id in remote) { var rd = remote[id].downAt; if (rd && nowMs - rd < 1000 && nowMs - rd > 0) { unlockFun('lightning'); break; } }
   }
+  var zenSince = 0;
+  setInterval(function () {   // Zen Lover: holding alone for 30 seconds
+    var n = performance.now();
+    if (mineDown && !remoteActive(n)) { if (!zenSince) zenSince = n; else if (n - zenSince >= 30000) unlockFun('zen'); } else zenSince = 0;
+  }, 1000);
   setInterval(function () {   // Siamese Twins: holding together for a minute
     var n = performance.now();
     if (mineDown && remoteActive(n)) { if (!holdTogetherSince) holdTogetherSince = n; else if (n - holdTogetherSince >= 60000) unlockFun('siamese'); }
@@ -1256,6 +1366,29 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var run = first ? (funGet('ebrun') && funGet('ebday') === dayKey(y.getTime()) && funGet('ebfirst') ? funGet('ebrun') + 1 : 1) : 0;
     var c = funCounts(); c.ebday = today; c.ebrun = run; c.ebfirst = first; lsSet(K('funn'), JSON.stringify(c));
     if (run >= 7) unlockFun('earlybird');
+  }
+  // each phone tells the other when it had its morning, its late night, and its sunrise (local time)
+  function daySignal(kind) {
+    var today = dayKey(Date.now());
+    if (funGet('sig_' + kind) === today) return;
+    funSet('sig_' + kind, today);
+    funSet('my_' + kind, Date.now());
+    sendReliable({ t: 'daysig', k: kind });
+    pairCheck(kind);
+  }
+  function pairCheck(kind) {
+    var mine = funGet('my_' + kind), theirs = funGet('their_' + kind);
+    if (mine && theirs && Math.abs(mine - theirs) < 20 * 3600000) unlockFun(kind === 'mrn' ? 'coffee' : kind === 'slp' ? 'sleepover' : 'sunrise');
+  }
+  function adoptDaySig(m, mineDev, tms) {
+    if (mineDev || ['mrn', 'slp', 'gm'].indexOf(m.k) < 0) return;
+    if (tms > (funGet('their_' + m.k) || 0)) funSet('their_' + m.k, tms);
+    pairCheck(m.k);
+  }
+  function localSignals() {
+    var h = new Date().getHours();
+    if (h >= 7 && h < 10) daySignal('mrn');
+    if (h >= 23 || h < 2) daySignal('slp');
   }
   function funInboxSeen(list) {
     var c = funCounts(), seenT = c.seenT || [];
@@ -1482,6 +1615,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     var n = 0; for (var k in fogCells) n++;
     if (!fogDone && n >= FOG_GX * FOG_GY * 0.45) {
       fogDone = true;
+      if (funBump('wipes') >= 10) unlockFun('steamroom');
       fogCv.classList.add('gone');
       fogMsg.classList.add('done');
       vib([30, 60, 30]);
@@ -1563,6 +1697,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }
   }
   function sameMood() {
+    if (myMood && myMood.mo && theirMood && theirMood.mo && myMood.mo.l === theirMood.mo.l) {   // Matching Moods: the same mood on 3 days in a row
+      funSetAdd('samemooddays', dayKey(Date.now()));
+      if (runOfDays('samemooddays', 1, 3) >= 3) unlockFun('matching');
+    }
     if (myMood && myMood.mo && theirMood && theirMood.mo && myMood.mo.l === theirMood.mo.l && myMood.mo.e === theirMood.mo.e && Math.abs(myMood.at - theirMood.at) <= 300000) unlockFun('mindreader');
   }
   function adoptMood(m, mineDev, live) {
@@ -1619,6 +1757,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function openMood() { usedGesture('mood'); document.getElementById('moodAddBox').hidden = true; fillMoodPanel(); moodPanel.hidden = false; }
   function setMyMood(mo) {
     var at = Date.now();
+    if (mo) {
+      if (funSetAdd('moodsused', mo.l) >= 6) unlockFun('rainbow');
+      if (mo.l === 'Cuddly' && funBump('cuddly') >= 10) unlockFun('cuddle');
+    }
     myMood = { mo: mo, at: at };
     lsSet(K('moodmine'), JSON.stringify(myMood));
     sameMood();
@@ -1640,6 +1782,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     moodCustom[mid] = mo;
     lsSet(K('moodcustom'), JSON.stringify(moodCustom));
     sendReliable({ t: 'moodadd', mid: mid, mo: mo });
+    unlockFun('mooddesigner');
     document.getElementById('moodEmo').value = ''; document.getElementById('moodLabel').value = '';
     document.getElementById('moodAddBox').hidden = true;
     fillMoodPanel();
@@ -1658,6 +1801,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (jarStore[m.jid]) return;
     jarStore[m.jid] = { n: m.n.slice(0, 140), dv: String(m.dv || ''), at: tms };
     lsSet(K('jar'), JSON.stringify(jarStore));
+    if (Object.keys(jarStore).length >= 50) unlockFun('fulljar');
   }
   // the jar opens with its own gesture: flip the phone face down and back up, then hold the tip within 4 s
   var jarPanel = document.getElementById('jarPanel'), jarInput = document.getElementById('jarInput');
@@ -1699,6 +1843,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     lsSet(K('jarseen'), seenJ.slice(-200).join(','));
     jarBox.textContent = jarStore[pick].n;
     jarBox.hidden = false;
+    if (funBump('jarpulls') >= 25) unlockFun('honeyjar');
+    if (theirs.length >= 5 && theirs.every(function (k) { return seenJ.indexOf(k) >= 0; })) unlockFun('fullcircle');
     logMsg('jar', '🫙 ' + jarStore[pick].n);
     vib([40, 60, 40]);
     sfx('note');
@@ -1763,6 +1909,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function inVulva(x, y) { return bvFig === 'toy' && x > 43.5 && x < 56.5 && y > 100 && y < 114; }
   function daddyUp() {
     clearTimeout(eggTimer);
+    if (!bvTest && funBump('daddyegg') >= 10) unlockFun('risingstar');
     dPenis.classList.add('up');
     bvEgg.textContent = 'Good Girl';
     bvEgg.classList.add('show');
@@ -1774,6 +1921,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function toyTingle() {
     sfx('bells');
+    if (!bvTest && funBump('toyegg') >= 10) unlockFun('bellringer');
     var ns = 'http://www.w3.org/2000/svg';
     for (var i = 0; i < 12; i++) {
       var tx = document.createElementNS(ns, 'text');
@@ -1846,6 +1994,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       var a = b.getAttribute('data-a'), nid = Math.random().toString(36).slice(2, 10), pk = bvPick, fg = bvFig;
       bodyView.hidden = true; bvMode = '';
       funSpot(pk.x, pk.y, a);
+      var cell = Math.floor(pk.x / 10) + ',' + Math.floor(pk.y / 10);
+      if (Object.keys(funCounts().cells || {}).length >= 25) unlockFun('cartographer');
+      if (a === 'kiss' && funSetAdd('kisscells', cell) >= 15) unlockFun('kisscollector');
+      if (funBump(fg === 'daddy' ? 'mapdaddy' : 'maptoy') >= 10) unlockFun(fg === 'daddy' ? 'daddyfav' : 'toybox');
       sendReliable({ t: 'spot', nid: nid, x: pk.x, y: pk.y, a: a, f: fg }, function (okSent) {
         if (okSent) {
           var out = loadOut(); out[nid] = 0; saveOut(out);
@@ -1871,6 +2023,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (lsGet(K('gm')) === dk) return;
     lsSet(K('gm'), dk);
     sunT0 = performance.now() / 1000;
+    try { daySignal('gm'); } catch (e) {}
     setTimeout(function () { startLove(performance.now() / 1000, 'Good morning, my love ☀️', { quiet: true }); sfx('love'); }, 1600);
   }
   document.getElementById('askLater').addEventListener('click', function () { answerAsk('later'); });
@@ -1888,6 +2041,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (okSent) {
         var out = loadOut(); out[nid] = 0; saveOut(out);
         showToast('Note sent 💌 Hidden until they open the heart', 6000);
+        if (funBump('notes') >= 10) unlockFun('penpal');
       } else {
         showMsg(code === 429 ? 'The free relay is limiting us right now (too many messages). Wait a few minutes and try again.'
           : code > 0 ? "Couldn't send the note (relay error " + code + '). Try again.'
@@ -2482,7 +2636,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function openInbox() {
     inboxList.textContent = '';
     var a = loadInbox().slice().reverse();
-    try { funInboxSeen(a); } catch (e) {}
+    try { funInboxSeen(a); if (funBump('mailopen') >= 30) unlockFun('maillover'); } catch (e) {}
     if (!a.length) {
       var e = document.createElement('li'); e.className = 'empty'; e.textContent = 'No messages yet'; inboxList.appendChild(e);
     }
@@ -2650,7 +2804,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (obj.t === 'anniv') return fbReq('PUT', '/anniv', e);
     if (obj.t === 'mood') return fbReq('PUT', '/mood/' + safeKey(did), e);
     if (obj.t === 'moodadd' && /^[a-z0-9]{1,16}$/.test(obj.mid || '')) return fbReq('PUT', '/moodlist/' + obj.mid, e);
-    if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread' || obj.t === 'askans' || obj.t === 'aggr') return fbReq('POST', '/msgs', e);
+    if ((obj.t === 'touch' && obj.d === 1) || obj.t === 'noteread' || obj.t === 'askans' || obj.t === 'aggr' || obj.t === 'daysig') return fbReq('POST', '/msgs', e);
     e.q = Math.random().toString(36).slice(2, 10);
     return fbReq('PUT', '/live/' + me, e);
   }
@@ -2730,6 +2884,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (outN[m.nid] === 0) { outN[m.nid] = 1; saveOut(outN); showMsg(rtxt); logMsg('read', rtxt); }
     }
     if (m.t === 'mood' && typeof m.at === 'number') adoptMood(m, mineDev, live);
+    if (m.t === 'daysig' && typeof m.k === 'string') adoptDaySig(m, mineDev, tms);
     if (m.t === 'jar') adoptJar(m, mineDev, tms);
     if (m.t === 'spot' && !mineDev && typeof m.nid === 'string' && /^[a-z0-9]{1,16}$/.test(m.nid) && SPOT_TXT[m.a] && !noteSeenBefore(d.id)) {
       noteQueue.push({ kind: 'spot', x: clampN(m.x, 0, 100), y: clampN(m.y, 0, 200), a: m.a, f: m.f === 'daddy' ? 'daddy' : 'toy', nid: m.nid, at: tms });
@@ -2745,7 +2900,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (m.t === 'askans' && !mineDev && typeof m.nid === 'string') {
       var outA = loadOut();
       var atxt = m.a === 'yes' ? '😈 Yes! Tonight.' : '😇 Maybe later';
-      if (outA[m.nid] === 0) { outA[m.nid] = 1; saveOut(outA); showMsg(atxt); logMsg('ask', 'Tonight? ' + atxt); if (m.a === 'yes') { wantT0 = performance.now() / 1000; if (funBump('yes') >= 5) unlockFun('bootycall'); } }
+      if (outA[m.nid] === 0) { outA[m.nid] = 1; saveOut(outA); showMsg(atxt); logMsg('ask', 'Tonight? ' + atxt); if (m.a === 'yes') { wantT0 = performance.now() / 1000; if (funBump('yes') >= 5) unlockFun('bootycall'); if (funTimes('yesweek', 7 * 86400000) >= 3) unlockFun('tonightevery'); if (funGet('laterday') === dayKey(Date.now())) unlockFun('patience'); } else funSet('laterday', dayKey(Date.now())); }
     }
     if (!mineDev && okZone(m.z) && m.z !== partnerZone) { partnerZone = m.z; lsSet(K('pzone'), partnerZone); }
     if (m.t === 'touch' || m.t === 'hold' || m.t === 'up') {
@@ -2768,12 +2923,13 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     } else if (m.t === 'touch') {
       // a press that arrives while this page is hidden still counts as "loved while away" (the history replay later skips it as already seen)
       if (m.d === 1 && document.visibilityState === 'hidden') { pending += pressCount(m); savePending(); }
-      if (m.d === 1) sfx('beat');
+      if (m.d === 1) { sfx('beat'); try { funPartnerPress(m); } catch (er) {} }
       rp.downAt = tn; rp.holdAt = 0; rp.upAt = 0;
       addTouch(clampUnit(m.u), clampUnit(m.v), false);
       if (pressCount(m) > 1) setTimeout(function () { addTouch(clampUnit(m.u) + (Math.random() - 0.5) * 3, clampUnit(m.v) + (Math.random() - 0.5) * 3, false); }, 110);
       maybeLove();
     } else if (m.t === 'fx' && FX_OK[m.k] === 1) {
+      if (m.k === 'good' && funBump('goodgot') >= 10) unlockFun('goodboy');
       runFx(m.k, { u: clampUnit(m.u), v: clampUnit(m.v), d: m.d === -1 ? -1 : 1, i: Number(m.i) || 0 }, true);
     } else if (m.t === 'kiss') {
       if (m.k === 'bg') startKissRain(tn / 1000);
@@ -2791,7 +2947,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var catchingUp = false;   // true while the saved messages are being read after opening or returning
   function historyDone() {
     catchingUp = false;
-    setTimeout(function () { try { funMorning(); } catch (e) {} }, 1500);   // after presence is known
+    setTimeout(function () { try { funMorning(); localSignals(); } catch (e) {} }, 1500);   // after presence is known
     setTimeout(maybeGoodMorning, 400);
     savePending();
     checkStreak();
@@ -3099,6 +3255,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       seq.tip = seq.left = seq.right = 0;
       startKissRain(now / 1000);
       usedGesture('kissrain');
+      if (funBump('n_kissrain') >= 10) unlockFun('kissstorm');
       send({ t: 'kiss', k: 'bg' });
     }
   }
@@ -3161,7 +3318,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (dip && t3 && t3.dip && t2.dip && now - t3.t < 900) {
       taps.length = 0;
       if (now - lastWantAt > 3000) { lastWantAt = now; doFx('want', {}); }
-    } else if (!inside && t3 && !t3.inside && !t2.inside && near(t1, t2) && near(t2, t3) && now - t3.t < 900) {
+    } else if (!inside && n >= 6 && taps.slice(-6).every(function (q, qi, arr) { return !q.inside && (!qi || near(q, arr[qi - 1])); }) && now - taps[n - 6].t < 2400) {
       taps.length = 0;
       doFx('rizz', { i: Math.floor(Math.random() * RIZZ.length) });
     } else if (inside && !dip && t2 && t2.inside && !t2.dip && near(t1, t2) && now - t2.t < 350) {
@@ -3195,6 +3352,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var sessionTaps = 0, aggrDone = false;
   function countTap() {
     sessionTaps++;
+    if (sessionTaps === 500) unlockFun('loveextreme');
     if (sessionTaps >= 200 && !aggrDone) {
       aggrDone = true;
       usedGesture('aggr');
