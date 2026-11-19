@@ -153,6 +153,16 @@ body {
 .bvtrail { fill: none; stroke: #ffb3e1; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 60; filter: drop-shadow(0 0 3px #ff4fb8) drop-shadow(0 0 7px #ff4fb8); animation: bvTrail 2.4s ease-in-out forwards; }
 .bvring { fill: none; stroke: #ffd0ea; stroke-width: 1; animation: bvShiverRing 1.6s ease-out forwards; }
 .fig.shiver { animation: bvShiver .45s linear 3; }
+@keyframes bvHold { 0%, 100% { r: 5; opacity: .85; } 50% { r: 17; opacity: .25; } }
+@keyframes bvSweep { 0% { transform: translateX(-16px); opacity: 0; } 20% { opacity: .9; } 80% { opacity: .9; } 100% { transform: translateX(16px); opacity: 0; } }
+@keyframes bvGoose { 0% { transform: scale(0); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(.6); opacity: 0; } }
+@keyframes bvMarkFade { 0% { opacity: 0; } 15% { opacity: .95; } 100% { opacity: .2; } }
+@keyframes bvKissPop { 0% { transform: scale(0) rotate(-20deg); opacity: 0; } 60% { transform: scale(1.3) rotate(-12deg); opacity: 1; } 100% { transform: scale(1) rotate(-12deg); opacity: .95; } }
+.bvhold { fill: rgba(255,170,90,.35); stroke: #ffc27a; stroke-width: 1.2; animation: bvHold 1.6s ease-in-out 4; }
+.bvsweep { fill: rgba(255,210,235,.55); filter: blur(1.2px); animation: bvSweep 1.5s ease-in-out 2; }
+.bvgoose { fill: #ffe3f3; animation: bvGoose 1.4s ease-out forwards; }
+.bvlove { fill: rgba(150,20,90,.7); filter: blur(.8px); animation: bvMarkFade 12s ease-out forwards; }
+.bvkiss { font-size: 9px; text-anchor: middle; dominant-baseline: middle; animation: bvKissPop .5s ease-out forwards; }
 @keyframes tingleRun { 0% { opacity: 0; transform: translate(0, 4px); } 25% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx, 6px), -10px); } }
 .bodyview .bvtabs { display: flex; gap: 8px; }
 .bodyview .bvtabs[hidden] { display: none; }
@@ -2031,7 +2041,38 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (fig) { fig.classList.remove('shiver'); void fig.getBoundingClientRect(); fig.classList.add('shiver'); setTimeout(function () { fig.classList.remove('shiver'); }, 1500); }
     vib([25, 40, 25, 40, 25, 40, 25]);
   }
+  function spotFx(item) {   // Daddy's map: a small effect for each action
+    var ns = 'http://www.w3.org/2000/svg', x = item.x, y = item.y, a = item.a;
+    function add(tag, attrs, life) {
+      var el = document.createElementNS(ns, tag);
+      for (var k in attrs) el.setAttribute(k, attrs[k]);
+      el.setAttribute('data-spotfx', '1'); bvSvg.appendChild(el);
+      if (life) setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, life);
+      return el;
+    }
+    if (a === 'hold') {
+      add('circle', { cx: x, cy: y, r: 5, 'class': 'bvhold' }, 7000);
+      vib([200, 120, 200, 700, 200, 120, 200]);
+    } else if (a === 'lick') {
+      add('ellipse', { cx: x, cy: y, rx: 9, ry: 2.4, 'class': 'bvsweep' }, 3300);
+      vib(60);
+    } else if (a === 'kiss') {
+      var t = add('text', { x: x, y: y, 'class': 'bvkiss' }); t.textContent = '💋';
+      vib([30, 50, 30]);
+    } else if (a === 'touch') {
+      for (var i = 0; i < 9; i++) {
+        var g = add('text', { x: (x + (Math.random() - .5) * 20).toFixed(1), y: (y + (Math.random() - .5) * 20).toFixed(1), 'class': 'bvgoose', 'font-size': 4, 'text-anchor': 'middle' }, 2800);
+        g.textContent = '✦'; g.style.animationDelay = (i * 0.15).toFixed(2) + 's'; g.style.transformOrigin = 'center'; g.style.transformBox = 'fill-box';
+      }
+      vib([20, 40, 20, 40, 20]);
+    } else if (a === 'bite') {
+      add('ellipse', { cx: x, cy: y, rx: 4.2, ry: 2.6, 'class': 'bvlove' }, 12500);
+      vib([70, 40, 120]);
+    }
+  }
+  function clearSpotFx() { [].forEach.call(bvSvg.querySelectorAll('[data-spotfx]'), function (el) { el.parentNode.removeChild(el); }); }
   function openSpot(item, replay) {
+    clearSpotFx();
     eggReset(); bvTest = false;
     bvMode = 'view'; bvItem = replay ? null : item;
     document.getElementById('bvTop').textContent = SPOT_TXT[item.a] || SPOT_TXT.kiss;
@@ -2042,6 +2083,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     document.getElementById('bvClose').textContent = 'Close';
     bodyView.hidden = false;
     if (item.a === 'stroke') strokeFx(item.x, item.y);
+    else if (item.f === 'daddy') spotFx(item);
     if (!replay) {
       logMsg('spot', SPOT_TXT[item.a], item.at || Date.now(), { sx: item.x, sy: item.y, sa: item.a, sf: item.f });
       buzz([90, 70, 90, 70, 200], true);
@@ -2088,7 +2130,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   });
   function closeBody() {
     var wasView = bvMode === 'view';
-    bodyView.hidden = true; bvMode = ''; bvItem = null; bvTest = false; eggReset();
+    bodyView.hidden = true; bvMode = ''; bvItem = null; bvTest = false; eggReset(); clearSpotFx();
     if (wasView) { noteShowing = false; showNextNote(); }
   }
   document.getElementById('bvClose').addEventListener('click', closeBody);
