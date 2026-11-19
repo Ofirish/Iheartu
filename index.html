@@ -147,6 +147,12 @@ body {
 .bodyview .bvegg { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%) scale(.6); opacity: 0; pointer-events: none; font-family: var(--font-display); font-style: italic; font-size: 3rem; color: #fff; text-shadow: 0 0 16px #ff4fa3, 0 0 34px #b890ff; transition: opacity .5s, transform .5s; white-space: nowrap; }
 .bodyview .bvegg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .bodyview .tingle { font-family: var(--font-display); font-style: italic; font-size: 5px; fill: #fff; paint-order: stroke; stroke: rgba(255,79,163,.7); stroke-width: .6; pointer-events: none; animation: tingleRun 2.6s ease-in-out forwards; }
+@keyframes bvTrail { 0% { stroke-dashoffset: 60; opacity: 0; } 15% { opacity: 1; } 70% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes bvShiverRing { 0% { r: 3; opacity: .9; } 100% { r: 22; opacity: 0; } }
+@keyframes bvShiver { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-.7px); } 30% { transform: translateX(.7px); } 45% { transform: translateX(-.5px); } 60% { transform: translateX(.5px); } 80% { transform: translateX(-.25px); } }
+.bvtrail { fill: none; stroke: #ffb3e1; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 60; filter: drop-shadow(0 0 3px #ff4fb8) drop-shadow(0 0 7px #ff4fb8); animation: bvTrail 2.4s ease-in-out forwards; }
+.bvring { fill: none; stroke: #ffd0ea; stroke-width: 1; animation: bvShiverRing 1.6s ease-out forwards; }
+.fig.shiver { animation: bvShiver .45s linear 3; }
 @keyframes tingleRun { 0% { opacity: 0; transform: translate(0, 4px); } 25% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx, 6px), -10px); } }
 .bodyview .bvtabs { display: flex; gap: 8px; }
 .bodyview .bvtabs[hidden] { display: none; }
@@ -2011,6 +2017,20 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     document.getElementById('bvClose').textContent = 'Cancel';
     bodyView.hidden = false;
   }
+  function strokeFx(x, y) {   // glowing trail along the stroke + a shiver through the skin
+    var ns = 'http://www.w3.org/2000/svg', made = [];
+    var d = 'M' + (x - 2) + ' ' + y + ' C ' + (x + 5) + ' ' + (y + 8) + ', ' + (x - 5) + ' ' + (y + 18) + ', ' + (x + 1) + ' ' + (y + 28);
+    var p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); p.setAttribute('class', 'bvtrail'); made.push(p);
+    for (var i = 0; i < 3; i++) {
+      var c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', x); c.setAttribute('cy', y + i * 9); c.setAttribute('class', 'bvring');
+      c.style.animationDelay = (0.25 + i * 0.35).toFixed(2) + 's'; made.push(c);
+    }
+    made.forEach(function (el) { bvSvg.appendChild(el); setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 3200); });
+    var fig = bvSvg.querySelector('.fig[data-fig="' + bvFig + '"]');
+    if (fig) { fig.classList.remove('shiver'); void fig.getBoundingClientRect(); fig.classList.add('shiver'); setTimeout(function () { fig.classList.remove('shiver'); }, 1500); }
+    vib([25, 40, 25, 40, 25, 40, 25]);
+  }
   function openSpot(item, replay) {
     eggReset(); bvTest = false;
     bvMode = 'view'; bvItem = replay ? null : item;
@@ -2021,6 +2041,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     document.getElementById('bvChoose').hidden = true;
     document.getElementById('bvClose').textContent = 'Close';
     bodyView.hidden = false;
+    if (item.a === 'stroke') strokeFx(item.x, item.y);
     if (!replay) {
       logMsg('spot', SPOT_TXT[item.a], item.at || Date.now(), { sx: item.x, sy: item.y, sa: item.a, sf: item.f });
       buzz([90, 70, 90, 70, 200], true);
