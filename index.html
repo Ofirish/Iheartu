@@ -2042,7 +2042,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     if (fig) { fig.classList.remove('shiver'); void fig.getBoundingClientRect(); fig.classList.add('shiver'); setTimeout(function () { fig.classList.remove('shiver'); }, 1500); }
     vib([25, 40, 25, 40, 25, 40, 25]);
   }
-  function spotFx(item) {   // Daddy's map: a small effect for each action
+  function spotFx(item) {   // a small effect for each action, on both maps
     var ns = 'http://www.w3.org/2000/svg', x = item.x, y = item.y, a = item.a;
     function add(tag, attrs, life) {
       var el = document.createElementNS(ns, tag);
@@ -2073,7 +2073,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function playSpot(a, x, y, fg) {   // shown to the one who sends it and the one who receives it
     if (a === 'stroke') strokeFx(x, y);
-    else if (fg === 'daddy') spotFx({ a: a, x: x, y: y });
+    else spotFx({ a: a, x: x, y: y });
     bvQuiet = true;
     if (inPenis(x, y)) { daddyUp(); daddyDown(); }   // the Daddy surprise rises and lowers again
     else if (inVulva(x, y)) toyTingle();              // the Toy tingle
