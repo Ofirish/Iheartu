@@ -1580,7 +1580,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function showNextNote() {
     if (noteShowing || !noteQueue.length) return;
-    if (bvMode === 'pick') return;   // never replace a body map the person is still filling in; it shows when they are done
+    if (bvMode === 'pick' || bvMode === 'sent') return;   // never replace a body map the person is still filling in; it shows when they are done
     noteShowing = true;
     var item = noteQueue.shift();
     if (item.kind === 'fog') { openFog(item); return; }
@@ -1963,7 +1963,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   var SPOT_TXT = { kiss: 'I want to kiss you… here 💋', touch: 'I want to touch you… here ✋', bite: 'I want to bite you… here 😈', lick: 'I want to lick you… here 👅', hold: 'I want to hold you… here 🤲', stroke: 'I want to stroke you… here 🪶' };
   function clampN(n, a, b) { n = Number(n); return isFinite(n) ? Math.max(a, Math.min(b, n)) : a; }
   var bodyView = document.getElementById('bodyView'), bvSvg = document.getElementById('bvSvg'), bvMark = document.getElementById('bvMark');
-  var bvMode = '', bvPick = null, bvItem = null, bvFig = 'toy';
+  var bvQuiet = false, bvMode = '', bvPick = null, bvItem = null, bvFig = 'toy';
   function setFig(f) {
     bvFig = f === 'daddy' ? 'daddy' : 'toy';
     [].forEach.call(bvSvg.querySelectorAll('.fig'), function (g) { g.style.display = g.getAttribute('data-fig') === bvFig ? '' : 'none'; });
@@ -1984,7 +1984,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function inVulva(x, y) { return bvFig === 'toy' && x > 43.5 && x < 56.5 && y > 100 && y < 114; }
   function daddyUp() {
     clearTimeout(eggTimer);
-    if (!bvTest && funBump('daddyegg') >= 10) unlockFun('risingstar');
+    if (!bvTest && !bvQuiet && funBump('daddyegg') >= 10) unlockFun('risingstar');
     dPenis.classList.add('up');
     bvEgg.textContent = 'Good Girl';
     bvEgg.classList.add('show');
@@ -1996,7 +1996,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function toyTingle() {
     sfx('bells');
-    if (!bvTest && funBump('toyegg') >= 10) unlockFun('bellringer');
+    if (!bvTest && !bvQuiet && funBump('toyegg') >= 10) unlockFun('bellringer');
     var ns = 'http://www.w3.org/2000/svg';
     for (var i = 0; i < 12; i++) {
       var tx = document.createElementNS(ns, 'text');
@@ -2071,6 +2071,14 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       vib([70, 40, 120]);
     }
   }
+  function playSpot(a, x, y, fg) {   // shown to the one who sends it and the one who receives it
+    if (a === 'stroke') strokeFx(x, y);
+    else if (fg === 'daddy') spotFx({ a: a, x: x, y: y });
+    bvQuiet = true;
+    if (inPenis(x, y)) { daddyUp(); daddyDown(); }   // the Daddy surprise rises and lowers again
+    else if (inVulva(x, y)) toyTingle();              // the Toy tingle
+    bvQuiet = false;
+  }
   function clearSpotFx() { [].forEach.call(bvSvg.querySelectorAll('[data-spotfx]'), function (el) { el.parentNode.removeChild(el); }); }
   function openSpot(item, replay) {
     clearSpotFx();
@@ -2083,8 +2091,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     document.getElementById('bvChoose').hidden = true;
     document.getElementById('bvClose').textContent = 'Close';
     bodyView.hidden = false;
-    if (item.a === 'stroke') strokeFx(item.x, item.y);
-    else if (item.f === 'daddy') spotFx(item);
+    playSpot(item.a, item.x, item.y, item.f);
     if (!replay) {
       logMsg('spot', SPOT_TXT[item.a], item.at || Date.now(), { sx: item.x, sy: item.y, sa: item.a, sf: item.f });
       buzz([90, 70, 90, 70, 200], true);
@@ -2114,8 +2121,15 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
       if (!bvPick) return;
       if (bvTest) { bodyView.hidden = true; bvMode = ''; bvTest = false; eggReset(); showToast('Test mode: nothing was sent', 2500); showNextNote(); return; }
       var a = b.getAttribute('data-a'), nid = Math.random().toString(36).slice(2, 10), pk = bvPick, fg = bvFig;
-      bodyView.hidden = true; bvMode = '';
-      setTimeout(showNextNote, 1200);   // then show anything that arrived while they were choosing
+      // the sender sees it too: the map stays open for a moment while it plays, then closes
+      bvMode = 'sent';
+      document.getElementById('bvChoose').hidden = true;
+      document.getElementById('bvTop').textContent = SPOT_TXT[a];
+      playSpot(a, pk.x, pk.y, fg);
+      setTimeout(function () {
+        if (bvMode !== 'sent') return;
+        bodyView.hidden = true; bvMode = ''; eggReset(); clearSpotFx(); showNextNote();
+      }, 3200);
       funSpot(pk.x, pk.y, a);
       var cell = Math.floor(pk.x / 10) + ',' + Math.floor(pk.y / 10);
       if (Object.keys(funCounts().cells || {}).length >= 25) unlockFun('cartographer');
