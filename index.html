@@ -367,7 +367,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     <g id="bvMark" class="mark" hidden><circle class="ring" r="7"/><circle class="dot" r="2.6"/></g>
   </svg>
   <div class="bvegg" id="bvEgg" aria-hidden="true"></div>
-  <div class="bvrow" id="bvChoose" hidden><button type="button" data-a="kiss">💋 Kiss</button><button type="button" data-a="touch">✋ Touch</button><button type="button" data-a="bite">😈 Bite</button></div>
+  <div class="bvrow" id="bvChoose" hidden><button type="button" data-a="kiss">💋 Kiss</button><button type="button" data-a="touch">✋ Touch</button><button type="button" data-a="lick">👅 Lick</button><button type="button" data-a="hold">🤲 Hold</button><button type="button" data-a="stroke">🪶 Stroke</button><button type="button" data-a="bite">😈 Bite</button></div>
   <div class="bvrow"><button type="button" id="bvClose">Cancel</button></div>
 </div>
 <div class="panel" id="achInfo" hidden>
@@ -1942,8 +1942,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     }, 400);
   }
 
-  // ---- Body map: drag from the bottom tip up to the dip, tap a spot, choose kiss, touch or bite ----
-  var SPOT_TXT = { kiss: 'I want to kiss you… here 💋', touch: 'I want to touch you… here ✋', bite: 'I want to bite you… here 😈' };
+  // ---- Body map: drag from the bottom tip up to the dip, tap a spot, choose kiss, touch, lick, hold, stroke or bite ----
+  var SPOT_TXT = { kiss: 'I want to kiss you… here 💋', touch: 'I want to touch you… here ✋', bite: 'I want to bite you… here 😈', lick: 'I want to lick you… here 👅', hold: 'I want to hold you… here 🤲', stroke: 'I want to stroke you… here 🪶' };
   function clampN(n, a, b) { n = Number(n); return isFinite(n) ? Math.max(a, Math.min(b, n)) : a; }
   var bodyView = document.getElementById('bodyView'), bvSvg = document.getElementById('bvSvg'), bvMark = document.getElementById('bvMark');
   var bvMode = '', bvPick = null, bvItem = null, bvFig = 'toy';
