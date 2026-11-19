@@ -2076,7 +2076,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
     else spotFx({ a: a, x: x, y: y });
     bvQuiet = true;
     if (inPenis(x, y)) { daddyUp(); daddyDown(); }   // the Daddy surprise rises and lowers again
-    else if (inVulva(x, y) || (fg === 'toy' && a !== 'bite')) toyTingle();   // the Toy tingle: always on Toy's map for kiss, touch, lick, hold and stroke
+    else if (inVulva(x, y)) toyTingle();              // the Toy tingle, only on the special zone
     bvQuiet = false;
   }
   function clearSpotFx() { [].forEach.call(bvSvg.querySelectorAll('[data-spotfx]'), function (el) { el.parentNode.removeChild(el); }); }
