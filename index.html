@@ -1580,6 +1580,7 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   }
   function showNextNote() {
     if (noteShowing || !noteQueue.length) return;
+    if (bvMode === 'pick') return;   // never replace a body map the person is still filling in; it shows when they are done
     noteShowing = true;
     var item = noteQueue.shift();
     if (item.kind === 'fog') { openFog(item); return; }
@@ -2111,9 +2112,10 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   [].forEach.call(document.querySelectorAll('#bvChoose button'), function (b) {
     b.addEventListener('click', function () {
       if (!bvPick) return;
-      if (bvTest) { bodyView.hidden = true; bvMode = ''; bvTest = false; eggReset(); showToast('Test mode: nothing was sent', 2500); return; }
+      if (bvTest) { bodyView.hidden = true; bvMode = ''; bvTest = false; eggReset(); showToast('Test mode: nothing was sent', 2500); showNextNote(); return; }
       var a = b.getAttribute('data-a'), nid = Math.random().toString(36).slice(2, 10), pk = bvPick, fg = bvFig;
       bodyView.hidden = true; bvMode = '';
+      setTimeout(showNextNote, 1200);   // then show anything that arrived while they were choosing
       funSpot(pk.x, pk.y, a);
       var cell = Math.floor(pk.x / 10) + ',' + Math.floor(pk.y / 10);
       if (Object.keys(funCounts().cells || {}).length >= 25) unlockFun('cartographer');
@@ -2131,7 +2133,8 @@ body.admin-open .caption { bottom: calc(38vh + 12px); }
   function closeBody() {
     var wasView = bvMode === 'view';
     bodyView.hidden = true; bvMode = ''; bvItem = null; bvTest = false; eggReset(); clearSpotFx();
-    if (wasView) { noteShowing = false; showNextNote(); }
+    if (wasView) noteShowing = false;
+    showNextNote();
   }
   document.getElementById('bvClose').addEventListener('click', closeBody);
   bodyView.addEventListener('click', function (e) { if (bvMode === 'view' && e.target === bodyView) closeBody(); });
